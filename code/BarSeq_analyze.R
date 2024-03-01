@@ -59,47 +59,66 @@ cluster_data = function(barseq, k=10, type="rank") {
 #load the relevant data files
 barseq <- readRDS('~/capsule/data/filt_neurons-fullbrain_cpm_log.rds') #keeps only cells with min_genes=5, min_counts=20
 
-#subset only barcoded cells for clustering analyses on the local machine
-barseq <- barseq[, barseq@colData$barcode == 1]
+# #subset only barcoded cells for clustering analyses on the local machine
+# barseq <- barseq[, barseq@colData$barcode == 1]
 
 v<-analyze_barseq(barseq, "barseq_output")
 new_barseq <- v[[1]]
 clusters <- v[[2]]
 
 #extract the UMAP coordinates, create plotting data frame and plot UMAP
+color_palette <- c("#800000", "#9A6324", "#808000", "#e6194B", "#f58231", "#ffe119",
+                   "#fabed4", "#ffd8b1", "#aaffc3", "#469990", "#fffac8", "#dcbeff",
+                   "#a9a9a9", "#bfef45", "#f032e6", "#3cb44b", "#42d4f4", "#911eb4", "#4363d8")
+
 umap_data <- reducedDim(new_barseq, "UMAP")
 plot_data <- data.frame(UMAP1 = umap_data[,1], UMAP2 = umap_data[,2], cluster = factor(clusters[["label"]]))
-p1 <- ggplot(plot_data, aes(x = UMAP1, y = UMAP2, color = cluster)) +
-  geom_point() +
-  scale_color_brewer(palette = "Set1") +
+total_genes <- colSums(counts(new_barseq))
+plot_data_cluster <- data.frame(UMAP1 = umap_data[,1], UMAP2 = umap_data[,2], cluster = factor(clusters[["label"]]))
+plot_data_genes <- data.frame(UMAP1 = umap_data[,1], UMAP2 = umap_data[,2], TotalGenes = total_genes)
+p1 <- ggplot(plot_data_cluster, aes(x = UMAP1, y = UMAP2, color = cluster)) +
+  geom_point(size = 0.1) +
+  scale_color_manual(values = color_palette, guide = guide_legend(override.aes = list(size=4))) +
   theme_minimal() +
   labs(title = "UMAP plot", x = "UMAP1", y = "UMAP2", color = "Cluster")
+plot(p1)
+dev.copy(pdf, "UMAP_ALLcells_clusters.pdf", width = 8, height = 10)
+dev.off()
+p2 <- ggplot(plot_data_genes, aes(x = UMAP1, y = UMAP2, color = TotalGenes)) +
+  geom_point(size = 0.1) +
+  scale_color_gradient(low = "grey", high = "yellow") +
+  theme_minimal() +
+  labs(title = "Total genes", x = "UMAP1", y = "UMAP2", color = "Total Genes")
+plot(p2)
+dev.copy(pdf, "UMAP_ALLcells_genecounts.pdf", width = 8, height = 10)
+dev.off()
 
 #add gene expression levels to the data frame and create gene expression plots
-genes <- c("Dbh", "Slc17a7", "Gad1")
+genes <- c("Dbh", "Th", "Slc17a7", "Gad1")
 for (gene in genes) {
   plot_data[[gene]] <- logcounts(new_barseq)[gene, ]
 }
-png("BarSeq_louvain_clust.png")
-plots <- list(p1)
+pdf("BarSeq_ALLcells_louvain_clust.pdf", width = 24, height = 18)
+plots <- list(p1, p2)
 for (gene in genes) {
   p <- ggplot(plot_data, aes_string(x = "UMAP1", y = "UMAP2", color = gene)) +
-    geom_point() +
+    geom_point(size = 0.1) +
     scale_color_gradient(low = "blue", high = "red") +
     theme_minimal() +
     labs(title = paste("UMAP plot of", gene, "expression"), x = "UMAP1", y = "UMAP2", color = "Expression")
   plots[[length(plots) + 1]] <- p
+  plot(p)
 }
-grid.arrange(grobs = plots, ncol = 2)
+grid.arrange(grobs = plots, ncol = 3)
 dev.off()
 
 #include cluster assignment data to the original SingleCellExperiment object
 table(clusters$label)
-all(clusters[['sample']]==colnames(LC_barseq)) # should be true
-colData(LC_barseq)$leiden_cluster <- as.factor(clusters[["label"]])
+all(clusters[['sample']]==colnames(barseq)) # should be true
+colData(barseq)$louvain_cluster <- as.factor(clusters[["label"]])
 
 #subset cells belonging to LC cluster and cluster them again
-LC_barseq <- barseq[, barseq@colData$leiden_cluster == 2]
+LC_barseq <- barseq[, barseq@colData$louvain_cluster == 11]
 
 v<-analyze_barseq(LC_barseq, "LC_output")
 new_barseq <- v[[1]]

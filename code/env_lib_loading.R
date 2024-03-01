@@ -5,10 +5,11 @@ library(Matrix)
 library(SingleCellExperiment)
 library(Seurat)
 library(MetaNeighbor)
-
+library(gridExtra)
 library(googlesheets4)
 library(sctransform)
 library(clustree)
+library(viridis)
 
 #example - reinstall a package under barseq-r4
 install.packages("reticulate")
