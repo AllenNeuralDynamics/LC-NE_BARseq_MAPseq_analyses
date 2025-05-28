@@ -20,3 +20,11 @@ system("ldconfig /usr/local/lib")
 use_python("/Python-3.7.12/python")
 use_condaenv("rstudio-r4-base",required = FALSE)
 use_condaenv("barseq-r4",required = FALSE)
+
+
+
+library(dplyr)
+
+library(gplots)
+
+library("R.matlab")

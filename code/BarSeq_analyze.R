@@ -132,7 +132,7 @@ p1 <- ggplot(plot_data, aes(x = UMAP1, y = UMAP2, color = cluster)) +
   scale_color_brewer(palette = "Set1") +
   theme_minimal() +
   labs(title = "UMAP plot", x = "UMAP1", y = "UMAP2", color = "Cluster")
-
+plot(p1)
 #add gene expression levels to the data frame and create gene expression plots
 genes <- c("Dbh", "Th", "Slc18a2")
 for (gene in genes) {
