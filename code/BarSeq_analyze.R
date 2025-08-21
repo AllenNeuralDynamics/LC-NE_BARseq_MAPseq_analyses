@@ -2,7 +2,7 @@
 # script order 03
 # barseq-r4 environment to run
 
-setwd('~/capsule/results')
+setwd('~/capsule/scratch')
 
 #perform primary analyses to  the BarSeq data (old params  k_umap=100, k_cluster=50)
 analyze_barseq = function(barseq, output_name, n_pca=30, k_umap=100, k_cluster=50) {
@@ -57,17 +57,18 @@ cluster_data = function(barseq, k=10, type="rank") {
 # }
 
 #load the relevant data files
-barseq <- readRDS('~/capsule/data/filt_neurons-fullbrain_cpm_log.rds') #keeps only cells with min_genes=5, min_counts=20
+barseq <- readRDS('~/capsule/scratch/combined_neurons_clust_CCFv2_uid_cpm_log.rds') #keeps only cells with min_genes=5, min_counts=20
+dim(barseq)
 
-# #subset only barcoded cells for clustering analyses on the local machine
+# #subset only barcoded cells for clustering analyses
 # barseq <- barseq[, barseq@colData$barcode == 1]
 
-v<-analyze_barseq(barseq, "barseq_output")
+v<-analyze_barseq(barseq, "barseq_all_QCed_cells")
 new_barseq <- v[[1]]
 clusters <- v[[2]]
 
 #extract the UMAP coordinates, create plotting data frame and plot UMAP
-color_palette <- c("#800000", "#9A6324", "#808000", "#e6194B", "#f58231", "#ffe119",
+color_palette <- c("#800000", "#808000", "#e6194B", "#f58231", "#ffe119",
                    "#fabed4", "#ffd8b1", "#aaffc3", "#469990", "#fffac8", "#dcbeff",
                    "#a9a9a9", "#bfef45", "#f032e6", "#3cb44b", "#42d4f4", "#911eb4", "#4363d8")
 
@@ -94,7 +95,7 @@ dev.copy(pdf, "UMAP_ALLcells_genecounts.pdf", width = 8, height = 10)
 dev.off()
 
 #add gene expression levels to the data frame and create gene expression plots
-genes <- c("Dbh", "Th", "Slc17a7", "Gad1")
+genes <- c("Dbh", "Th", "Slc6a2", "En1")
 for (gene in genes) {
   plot_data[[gene]] <- logcounts(new_barseq)[gene, ]
 }

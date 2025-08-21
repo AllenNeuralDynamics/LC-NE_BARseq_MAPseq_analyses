@@ -10,6 +10,8 @@ library(googlesheets4)
 library(sctransform)
 library(clustree)
 library(viridis)
+library(dplyr)
+library(gplots)
 
 #example - reinstall a package under barseq-r4
 install.packages("reticulate")
@@ -23,8 +25,7 @@ use_condaenv("barseq-r4",required = FALSE)
 
 
 
-library(dplyr)
 
-library(gplots)
 
-library("R.matlab")
+library(readr)
+library(doParallel)
