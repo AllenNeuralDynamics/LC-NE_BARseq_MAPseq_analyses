@@ -1,8 +1,8 @@
-####### Analyze transcriptomic data from pre-processed rds files #######
+####### Analyze transcriptomic data from pre-processed rds files (MATLAB file structure converted to rds format) #######
+####### Conversion requires use of library(hdf5r) not compatible with the current build hence performed separately ##########
 # script order 03
-# barseq-r4 environment to run
 
-setwd('~/capsule/scratch')
+setwd('~/capsule/scratch/brain4')
 
 #perform primary analyses to  the BarSeq data (old params  k_umap=100, k_cluster=50)
 analyze_barseq = function(barseq, output_name, n_pca=30, k_umap=100, k_cluster=50) {
@@ -57,7 +57,7 @@ cluster_data = function(barseq, k=10, type="rank") {
 # }
 
 #load the relevant data files
-barseq <- readRDS('~/capsule/scratch/combined_neurons_clust_CCFv2_uid_cpm_log.rds') #keeps only cells with min_genes=5, min_counts=20
+barseq <- readRDS('~/capsule/scratch/brain4/combined_neurons_clust_CCFv2_uid_cpm_log.rds') #keeps only cells with min_genes=5, min_counts=20
 dim(barseq)
 
 # #subset only barcoded cells for clustering analyses
@@ -119,7 +119,7 @@ all(clusters[['sample']]==colnames(barseq)) # should be true
 colData(barseq)$louvain_cluster <- as.factor(clusters[["label"]])
 
 #subset cells belonging to LC cluster and cluster them again
-LC_barseq <- barseq[, barseq@colData$louvain_cluster == 11]
+LC_barseq <- barseq[, barseq@colData$louvain_cluster == 6] # brain3 - cluster 11, brain4 - cluster 6
 
 v<-analyze_barseq(LC_barseq, "LC_output")
 new_barseq <- v[[1]]
