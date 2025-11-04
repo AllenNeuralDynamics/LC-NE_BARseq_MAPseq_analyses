@@ -19,5 +19,5 @@ mamba remove -n barseq-r4 --all && mamba remove -n r4-base --all && for f in /et
 mamba install -n r4-base -c conda-forge r-clustree 
 mamba install -n barseq-r4 -c conda-forge r-clustree r-reticulate=1.28 r-seurat
 Rscript -e '.libPaths("/opt/conda/envs/r4-base/lib/R/library/");install.packages("Matrix");install.packages("SeuratObject");devtools::install_github("satijalab/seurat-data")'
-Rscript -e '.libPaths("/opt/conda/envs/barseq-r4/lib/R/library/");remotes::install_version("Matrix",version="1.6-5");install.packages("irlba");install.packages("BiocManager");BiocManager::install("scater");BiocManager::install("MetaNeighbor");BiocManager::install("SingleCellExperiment");BiocManager::install("scran");install.packages("SeuratObject");devtools::install_github("satijalab/seurat-data");'
+Rscript -e '.libPaths("/opt/conda/envs/barseq-r4/lib/R/library/");remotes::install_version("Matrix",version="1.6-5");install.packages("irlba");install.packages("BiocManager");BiocManager::install("scater");BiocManager::install("MetaNeighbor");BiocManager::install("SingleCellExperiment");BiocManager::install("scran");install.packages("SeuratObject");devtools::install_github("satijalab/seurat-data");install.packages(c("doParallel", "R.matlab", "VennDiagram", "NMF"))'
 mamba install -n r4-base -c conda-forge -c bioconda r-ape r-umap
