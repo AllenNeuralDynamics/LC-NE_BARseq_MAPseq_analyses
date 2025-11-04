@@ -13,18 +13,18 @@ library(viridis)
 library(dplyr)
 library(gplots)
 
-#example - reinstall a package under barseq-r4
-install.packages("reticulate")
-library(reticulate)
-#use envs 
-conda_list()
-system("ldconfig /usr/local/lib")
-use_python("/Python-3.7.12/python")
-use_condaenv("rstudio-r4-base",required = FALSE)
-use_condaenv("barseq-r4",required = FALSE)
 
 
 
+# #example - reinstall a package under barseq-r4
+# install.packages("reticulate")
+# library(reticulate)
+# #use envs 
+# conda_list()
+# system("ldconfig /usr/local/lib")
+# use_python("/Python-3.7.12/python")
+# use_condaenv("rstudio-r4-base",required = FALSE)
+# use_condaenv("barseq-r4",required = FALSE)
 
 
 library(readr)
