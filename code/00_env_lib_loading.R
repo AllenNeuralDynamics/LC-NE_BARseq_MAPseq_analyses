@@ -12,20 +12,23 @@ library(clustree)
 library(viridis)
 library(dplyr)
 library(gplots)
-
-
-
-
-# #example - reinstall a package under barseq-r4
-# install.packages("reticulate")
-# library(reticulate)
-# #use envs 
-# conda_list()
-# system("ldconfig /usr/local/lib")
-# use_python("/Python-3.7.12/python")
-# use_condaenv("rstudio-r4-base",required = FALSE)
-# use_condaenv("barseq-r4",required = FALSE)
-
-
 library(readr)
+library(pheatmap)
+library(tidyr)
+library(FNN)  
+library(ggplot2)
+library(patchwork)
+library(plotly)
+library(RColorBrewer)
+library(stringr)
+library(readxl)
+library(digest)
+library(proxy)
+library(matrixStats)
+library(reshape2)
+library(htmlwidgets)
+library(grid)
 library(doParallel)
+library(R.matlab)
+library(VennDiagram)
+library(NMF)

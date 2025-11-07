@@ -1,10 +1,9 @@
-# hash:sha256:3499650d8cdc294a7ef6c6bf6676c63c4836fd16413ca7d527531da5131fb76c
-FROM registry.codeocean.allenneuraldynamics.org/codeocean/c2-seurat:latest
+# hash:sha256:b02abc5aeaa30c8f518b73947791cd29fddedef3b13bb1cbde0889b37ce47606
+ARG REGISTRY_HOST
+FROM $REGISTRY_HOST/codeocean/c2-seurat:latest
 
 ARG DEBIAN_FRONTEND=noninteractive
-
 ARG GIT_ASKPASS
-ARG GIT_ACCESS_TOKEN
 COPY git-askpass /
 
 RUN mamba install -y \

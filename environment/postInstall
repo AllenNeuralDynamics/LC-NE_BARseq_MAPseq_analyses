@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
 set -e
+
+# Install system dependencies early (before conda/R installs)
+apt-get update && apt-get install -y libglpk40
+
+# Install RStudio
 wget https://s3.amazonaws.com/rstudio-ide-build/server/jammy/amd64/rstudio-server-2023.03.0-374-amd64.deb
 gdebi --non-interactive rstudio-server-2023.03.0-374-amd64.deb
 rm rstudio-server-2023.03.0-374-amd64.deb
 
+# Install Python versions
 wget https://www.python.org/ftp/python/3.7.12/Python-3.7.12.tgz \
     && tar xvf Python-3.7.12.tgz \
     && cd Python-3.7.12 \
@@ -15,9 +21,17 @@ wget https://www.python.org/ftp/python/3.12.0/Python-3.12.0.tgz \
     && cd Python-3.12.0 \
     && ./configure --enable-shared \
     && make install
+
+# Recreate conda environments
 mamba remove -n barseq-r4 --all && mamba remove -n r4-base --all && for f in /etc/mamba-envs/*.yml; do mamba env create -f "$f"; done
+
+# Install conda packages
 mamba install -n r4-base -c conda-forge r-clustree 
 mamba install -n barseq-r4 -c conda-forge r-clustree r-reticulate=1.28 r-seurat
-Rscript -e '.libPaths("/opt/conda/envs/r4-base/lib/R/library/");install.packages("Matrix");install.packages("SeuratObject");devtools::install_github("satijalab/seurat-data")'
-Rscript -e '.libPaths("/opt/conda/envs/barseq-r4/lib/R/library/");remotes::install_version("Matrix",version="1.6-5");install.packages("irlba");install.packages("BiocManager");BiocManager::install("scater");BiocManager::install("MetaNeighbor");BiocManager::install("SingleCellExperiment");BiocManager::install("scran");install.packages("SeuratObject");devtools::install_github("satijalab/seurat-data");install.packages(c("doParallel", "R.matlab", "VennDiagram", "NMF"))'
 mamba install -n r4-base -c conda-forge -c bioconda r-ape r-umap
+
+# Install R packages in r4-base
+Rscript -e '.libPaths("/opt/conda/envs/r4-base/lib/R/library/");install.packages("Matrix");install.packages("SeuratObject");devtools::install_github("satijalab/seurat-data")'
+
+# Install R packages in barseq-r4 (including the new ones)
+Rscript -e '.libPaths("/opt/conda/envs/barseq-r4/lib/R/library/");remotes::install_version("Matrix",version="1.6-5");install.packages("irlba");install.packages("BiocManager");BiocManager::install("scater");BiocManager::install("MetaNeighbor");BiocManager::install("SingleCellExperiment");BiocManager::install("scran");install.packages("SeuratObject");devtools::install_github("satijalab/seurat-data");install.packages(c("doParallel", "R.matlab", "VennDiagram", "NMF"))'
