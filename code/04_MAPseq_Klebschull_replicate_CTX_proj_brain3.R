@@ -368,7 +368,6 @@ p <- ggplot(df_subset_long_combined, aes(x = ROI, y = Value, group = Cell_Source
   scale_fill_manual(values = c("RH" = "#f58231", "LH" = "#4363d8"))  # Set fill colors for RH and LH
 print(p)
 
-ggsave("RH_LH_rawcount_example_cortex_projections.png", plot = p, device = "png", dpi = 1200, width = 14, height = 10, units = "in")
 ggsave("RH_LH_rawcount_example_cortex_projections.pdf", plot = p, device = "pdf",width = 14, height = 10)
 
 range_df <- df_subset_long_combined %>%
@@ -389,7 +388,6 @@ hist_plot <- ggplot(range_df, aes(x = log_range, fill = Source)) +
   ggtitle("Distribution of log10(range) of projection strength by Source")
 print(hist_plot)
 
-ggsave("RH_LH_rawcount_hist_ctx.png", plot = hist_plot, device = "png", dpi = 300, width = 8, height = 8, units = "in")
 ggsave("RH_LH_rawcount_hist_ctx.pdf", plot = hist_plot, device = "pdf",width = 8, height = 8)
 
 
@@ -429,7 +427,7 @@ p_LH_cross <- ggplot(df_LH_cross_long, aes(x = ROI, y = Value, group = Cell)) +
   xlab('ctx projection target (ROIs)') +
   ggtitle('LH somas projecting to RH ctx')
 print(p_LH_cross)
-ggsave("LHsoma_rawcount_RHcortex_projections.png", plot = p_LH_cross, device = "png", dpi = 1200, width = 12, height = 10, units = "in")
+
 ggsave("LHsoma_rawcount_RHcortex_projections.pdf", plot = p_LH_cross, device = "pdf", width = 12, height = 10)
 
 # --- Cross-hemispheric projections: RH somas projecting to LH ctx ---
@@ -463,7 +461,7 @@ p_RH_cross <- ggplot(df_RH_cross_long, aes(x = ROI, y = Value, group = Cell)) +
   xlab('ctx projection target (ROIs)') +
   ggtitle('RH somas projecting to LH ctx')
 print(p_RH_cross)
-ggsave("RHsoma_rawcount_LHcortex_projections.png", plot = p_RH_cross, device = "png", dpi = 1200, width = 12, height = 10, units = "in")
+
 ggsave("RHsoma_rawcount_LHcortex_projections.pdf", plot = p_RH_cross, device = "pdf", width = 12, height = 10)
 
 
@@ -533,7 +531,7 @@ colors <- c("RH" = "#f58231", "LH" = "#4363d8")
 p_LH <- ggplot(df_combined_LH, aes(x = ROI, y = Value, group = Cell)) +
   geom_line(aes(color = ProjSide)) +
   geom_ribbon(aes(ymin = lower, ymax = upper, fill = ProjSide), alpha = 0.5) +
-  facet_grid(ProjSide ~ Cell, scales = "free_y") +
+  facet_grid(ProjSide ~ Cell, scales = "fixed") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 2),
         axis.title.x = element_text(size = 8),
@@ -547,14 +545,14 @@ p_LH <- ggplot(df_combined_LH, aes(x = ROI, y = Value, group = Cell)) +
   xlab('ctx projection target (ROIs)') +
   ggtitle('LH soma: ipsi- and contralateral cortex projections')
 print(p_LH)
-ggsave("LHsoma_rawcount_RH-LHprojections_side_by_side.png", plot = p_LH, device = "png", dpi = 1200, width = 16, height = 9, units = "in")
+
 ggsave("LHsoma_rawcount_RH-LHprojections_side_by_side.pdf", plot = p_LH, device = "pdf", width = 16, height = 9)
 
 # --- Plotting for RH somata ---
 p_RH <- ggplot(df_combined_RH, aes(x = ROI, y = Value, group = Cell)) +
   geom_line(aes(color = ProjSide)) +
   geom_ribbon(aes(ymin = lower, ymax = upper, fill = ProjSide), alpha = 0.5) +
-  facet_grid(ProjSide ~ Cell, scales = "free_y") +
+  facet_grid(ProjSide ~ Cell, scales = "fixed") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 2),
         axis.title.x = element_text(size = 8),
@@ -568,13 +566,13 @@ p_RH <- ggplot(df_combined_RH, aes(x = ROI, y = Value, group = Cell)) +
   xlab('ctx projection target (ROIs)') +
   ggtitle('RH soma: ipsi- and contralateral cortex projections')
 print(p_RH)
-ggsave("RHsoma_rawcount_LH-RHprojections_side_by_side.png", plot = p_RH, device = "png", dpi = 1200, width = 16, height = 9, units = "in")
+
 ggsave("RHsoma_rawcount_LH-RHprojections_side_by_side.pdf", plot = p_RH, device = "pdf", width = 16, height = 9)
 
 
 ########################################################### plot histograms with highest projection density regions for raw and log norm ##########################################################
 # Drop unwanted columns
-drop_cols <- c("slice", "barcode", "CCF_DV", "CCF_ML", "inRH")
+drop_cols <- c("slice", "barcode", "CCF_AP", "CCF_DV", "CCF_ML", "inRH")
 df_clean <- df[ , !(names(df) %in% drop_cols)]
 # Convert all columns to numeric
 df_numeric <- as.data.frame(lapply(df_clean, as.numeric))
@@ -613,7 +611,7 @@ means_norm <- all_means_norm[regions_norm]
 
 # Plot barplots with horizontal bars, light blue fill, and red dashed separator
 par(mfrow = c(1, 3), mar = c(6, 12, 4, 2)) # 3 plots side by side
-offset <- 0.45 # increase this value to move labels further left/up
+offset <- 0.65 # increase this value to move labels further left/up
 # Raw data barplot
 bp1 <- barplot(means_raw, horiz = TRUE, las = 1, main = "Raw Data", 
                xlab = "Mean Value", names.arg = regions_raw, cex.names = 1.2, col = "lightblue")
@@ -635,4 +633,5 @@ abline(h = 50.5, col = "red", lty = 2, lwd = 2)
 text(x = par("usr")[1] - offset * diff(par("usr")[1:2]), y = 25, labels = "top50", srt = 90, adj = 0.5, xpd = TRUE, col = "blue", cex = 1.2)
 text(x = par("usr")[1] - offset * diff(par("usr")[1:2]), y = 55, labels = "bottom10", srt = 90, adj = 0.5, xpd = TRUE, col = "blue", cex = 1.2)
 mtext("Row-normalized, log1p, max-normalized", side = 1, line = 4, cex = 1)
-quartz.save("top_bottom_innervated_areas_by_norm_method.png", type = "png", dpi = 600, bg = "white")
+dev.copy(pdf, "top_bottom_innervated_areas_by_norm_method.pdf", width = 12, height = 8)
+dev.off()
