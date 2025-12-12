@@ -2,7 +2,7 @@
 # Performs normalization, clustering, and spatial coherence analyses to isolate LC-NE neurons
 
 # Load functions
-source("~/capsule/code/01_BARseq_analyses_functions.R")
+source("~/capsule/code/1_BARseq_analyses_functions_brain4.R")
 
 # Set working directory
 setwd(BARSEQ_OUTPUT_DIR)
@@ -170,11 +170,11 @@ dev.off()
 table(clusters$label)
 # Define a threshold for gene expression (e.g., logcounts > 0)
 threshold <- 0
-# Subset cells from cluster 10
-cluster_10_cells <- which(clusters$label == 10)
+# Subset cells from cluster 5
+cluster_5_cells <- which(clusters$label == 5)
 # Extract logcounts for the genes of interest
 genes_of_interest <- c("Dbh", "Th", "Slc18a2", "Ddc")
-gene_expression <- logcounts(barseq)[genes_of_interest, cluster_10_cells]
+gene_expression <- logcounts(barseq)[genes_of_interest, cluster_5_cells]
 # Create a logical matrix: TRUE if expression > threshold, FALSE otherwise
 expression_matrix <- gene_expression > threshold
 # Count cells expressing each gene alone and in combination
@@ -208,7 +208,7 @@ saveRDS(barseq, "combined_neurons_clust_CCFv2_uid_cpm_log_clust.rds")
 
 # Subset out LC cluster such that only LC cluster neurons are retained for normalization
 dim(barseq)
-X <- 10 # specify which cluster to subset
+X <- 5 # specify which cluster to subset
 LC_barseq <- barseq[, colData(barseq)$louvain_cluster == X]
 dim(LC_barseq)
 
@@ -338,7 +338,7 @@ print(plot)
 ggsave("LC_cluster_cells_slices.pdf", plot = plot, device = "pdf", width = 20, height = 12)
 
 # Subset out LC-NE proper cells
-LCNE_barseq <- LC_barseq[, colData(LC_barseq)$louvain_cluster %in% c(1, 2, 3)]
+LCNE_barseq <- LC_barseq[, colData(LC_barseq)$louvain_cluster %in% c(4,5)]
 dim(LCNE_barseq)
 saveRDS(LCNE_barseq, "LCNE_cluster_neurons_CCFv2_uid.rds")
 
@@ -524,206 +524,13 @@ plot <- ggplot(LCNE_barseq_df, aes(x = CCF_ML, y = -CCF_DV, color = louvain_clus
 print(plot)
 ggsave("LCNE_cluster_cells_slices.pdf", plot = plot, device = "pdf", width = 20, height = 12)
 
-# Subset out LC-NE cells excluding the suspect cluster 5 mostly localizing outside NE cell groups
-LCNE_barseq_clusters_filtered <- LCNE_barseq[, colData(LCNE_barseq)$louvain_cluster %in% c(1, 2, 3, 4)]
-dim(LCNE_barseq_clusters_filtered)
-saveRDS(LCNE_barseq_clusters_filtered, "LCNE_clusters_filtered.rds")
-
-# Normalize and save LC-NE cluster object
-LCNE_barseq_clusters_filtered <- load_barseq(filename="LCNE_clusters_filtered.rds", from_output = TRUE)
-colData(LCNE_barseq_clusters_filtered)
-logcounts(LCNE_barseq_clusters_filtered) = log1p(cpm(LCNE_barseq_clusters_filtered))/log(2)
-saveRDS(LCNE_barseq_clusters_filtered,file.path(BARSEQ_OUTPUT_DIR, "LCNE_clusters_filtered_cpm_log.rds"))
-
-############################################################# re-cluster LC-NE cluster cleaned up cells ###########################################################
-# Clean up between processing steps
-clear_objects_except_functions()
-# Take cleaned up LC-NE cells and cluster them again
-LCNE <- readRDS("LCNE_clusters_filtered_cpm_log.rds")
-dim(LCNE)
-colData(LCNE)
-assayNames(LCNE)
-
-# Drop columns from previous processing
-cols_to_drop <- c("louvain_cluster")
-colData(LCNE) <- colData(LCNE)[, !(colnames(colData(LCNE)) %in% cols_to_drop)]
-
-# Run clustering on the data and save results to a named folder
-v<-analyze_barseq(LCNE, "barseq_LC_NE_clusters_filtered")
-new_barseq <- v[[1]]
-clusters <- v[[2]]
-
-#visualize UMAP of samples - set color palette
-n_clusters <- length(unique(clusters[["label"]]))
-color_palette <- get_cluster_colors(n_clusters)
-
-# Extract UMAP coordinates and total gene counts
-umap_data <- reducedDim(new_barseq, "UMAP")
-total_genes <- colSums(counts(new_barseq))
-
-# Create plotting data frames
-plot_data_cluster <- data.frame(UMAP1 = umap_data[,1], UMAP2 = umap_data[,2], cluster = factor(clusters[["label"]]))
-plot_data_genes <- data.frame(UMAP1 = umap_data[,1], UMAP2 = umap_data[,2], TotalGenes = total_genes)
-
-# Sort data for TotalGenes to plot higher values on top
-plot_data_genes <- plot_data_genes %>%
-  dplyr::arrange(TotalGenes)
-
-# Calculate cluster centroids
-centroid_data <- plot_data_cluster %>%
-  dplyr::group_by(cluster) %>%
-  dplyr::summarise(x = mean(UMAP1), y = mean(UMAP2))
-
-# Plot UMAP with clusters
-p1 <- ggplot(plot_data_cluster, aes(x = UMAP1, y = UMAP2, color = cluster)) +
-  geom_point(size = 0.05) +  # Smaller point size
-  scale_color_manual(values = color_palette) +
-  geom_text(data = centroid_data, aes(x = x, y = y, label = cluster), 
-            colour = "black", vjust = 1.6, hjust = 0.5, size = 3.5) +  # Add cluster numbers
-  theme_minimal() +
-  theme(panel.grid = element_blank()) +  # Remove grids
-  labs(title = "UMAP plot", x = "UMAP1", y = "UMAP2", color = "Cluster")
-
-# Plot UMAP with total gene counts
-p2 <- ggplot(plot_data_genes, aes(x = UMAP1, y = UMAP2, color = TotalGenes)) +
-  geom_point(size = 0.05) +  # Smaller point size
-  scale_color_gradient(low = "grey", high = "magenta") +
-  theme_minimal() +
-  theme(panel.grid = element_blank()) +  # Remove grids
-  labs(title = "Total genes", x = "UMAP1", y = "UMAP2", color = "Gene Count")
-
-# Add gene expression levels to the data frame
-genes <- c("Dbh", "Th", "Ddc", "Slc18a2")
-for (gene in genes) {
-  plot_data_cluster[[gene]] <- logcounts(new_barseq)[gene, ]
-}
-# Create gene expression plots
-plots <- list(p1, p2)
-for (gene in genes) {
-  # Sort data for each gene to plot higher expression values on top
-  plot_data_cluster <- plot_data_cluster %>%
-    dplyr::arrange(!!sym(gene))
-  
-  p <- ggplot(plot_data_cluster, aes(x = UMAP1, y = UMAP2, color = !!sym(gene))) +
-    geom_point(size = 0.05) +  # Smaller point size
-    scale_color_gradient(low = "cyan", high = "red") +
-    theme_minimal() +
-    theme(panel.grid = element_blank()) +  # Remove grids
-    labs(title = paste(gene, "expression"), x = "UMAP1", y = "UMAP2", color = "Logcounts")
-  
-  plots[[length(plots) + 1]] <- p
-}
-# Arrange all plots in a grid
-p_combined <- grid.arrange(grobs = plots, ncol = 3)
-print(p_combined)
-ggsave("LC_NE_clusters_filtered_top_features.pdf", plot = p_combined, device = "pdf", width = 14, height = 12)
-
-#include cluster assignment data to the original SingleCellExperiment object
-table(clusters$label)
-all(clusters[['sample']]==colnames(LCNE)) # should be true
-colData(LCNE)$louvain_cluster <- as.factor(clusters[["label"]])
-
-saveRDS(LCNE, "LCNE_clusters_filtered_cpm_log_clust.rds")
-
-#plot gene expression hetamap sorted by cluster
-# Extract log-normalized counts
-expr_matrix <- logcounts(LCNE)
-# Extract cluster labels
-cluster_labels <- colData(LCNE)$louvain_cluster
-# Sort the expression matrix by cluster labels
-sorted_indices <- order(cluster_labels)
-expr_matrix_sorted <- expr_matrix[, sorted_indices]
-# Update column names to reflect sorted cluster labels
-colnames(expr_matrix_sorted) <- cluster_labels[sorted_indices]
-# Add gene names as row names (if not already present)
-rownames(expr_matrix_sorted) <- rownames(LCNE)
-# Create a data frame for column annotations
-annotation_col <- data.frame(Cluster = factor(cluster_labels[sorted_indices]))  # Convert to factor
-rownames(annotation_col) <- paste0("Cell_", seq_len(ncol(expr_matrix_sorted)))  # Unique row names
-# Update column names of expr_matrix_sorted to match annotation_col row names
-colnames(expr_matrix_sorted) <- rownames(annotation_col)
-# Map the custom colors to the cluster levels
-cluster_colors <- setNames(color_palette[1:length(levels(annotation_col$Cluster))], 
-                           levels(annotation_col$Cluster))
-annotation_colors <- list(Cluster = cluster_colors)
-# Plot heatmap using pheatmap with annotations
-pheatmap(expr_matrix_sorted,
-         cluster_rows = FALSE,  # Disable row clustering to preserve order
-         cluster_cols = FALSE,  # Disable column clustering to preserve sorting
-         scale = "none",        # No scaling to match the original behavior
-         color = viridis::viridis(50),  # Use viridis color palette
-         show_rownames = TRUE,  # Show gene names as row labels
-         show_colnames = FALSE, # Hide dense column labels
-         annotation_col = annotation_col,  # Add cluster annotations
-         annotation_colors = annotation_colors,  # Use custom cluster-specific colors
-         main = "Log-count Gene Expression by Cluster",
-         fontsize_row = 6,      # Adjust font size for rows
-         legend = TRUE)         # Ensure legend is displayed
-dev.copy(pdf, "Log-count gene expression in LCNE clusters filtered.pdf", width = 10, height = 12)
-dev.off()
-
-# Sort gene expression within a cluster for heatmap plotting
-# Calculate total expression per cell 
-total_expr <- colSums(expr_matrix)
-sorted_indices_within <- c()
-for (clust in levels(cluster_labels)) {
-  cells_in_cluster <- which(cluster_labels == clust)
-  
-  # Sort cells inside cluster by total expression (descending)
-  order_in_cluster <- cells_in_cluster[order(total_expr[cells_in_cluster], decreasing = TRUE)]
-  
-  sorted_indices_within <- c(sorted_indices_within, order_in_cluster)
-}
-# Subset and reorder expression matrix and annotation
-expr_matrix_sorted <- expr_matrix[, sorted_indices_within]
-annotation_col <- data.frame(Cluster = factor(cluster_labels[sorted_indices_within]))
-rownames(annotation_col) <- paste0("Cell_", seq_len(ncol(expr_matrix_sorted)))
-colnames(expr_matrix_sorted) <- rownames(annotation_col)
-pheatmap(expr_matrix_sorted,
-         cluster_rows = TRUE,   # Let genes be clustered to reveal patterns
-         cluster_cols = FALSE,  # Keep your cell ordering intact
-         scale = "none",
-         color = viridis::viridis(50),
-         show_rownames = TRUE,
-         show_colnames = FALSE,
-         annotation_col = annotation_col,
-         annotation_colors = annotation_colors,
-         main = "Log-count Gene Expression by Cluster",
-         fontsize_row = 6,
-         legend = TRUE)
-dev.copy(pdf, "Log-count gene expression in LCNE  clusters filtered sorted.pdf", width = 10, height = 12)
-dev.off()
-
-# Calculate mean expression for each gene across clusters
-clusters_labels <- clusters[["label"]]
-logcounts_matrix <- logcounts(LCNE)  # Extract log-normalized counts
-# Create a data frame with cluster labels and logcounts
-expression_data <- as.data.frame(t(logcounts_matrix))  # Transpose to make cells rows
-expression_data$cluster <- cluster_labels
-# Calculate mean expression for each gene by cluster
-mean_expression <- expression_data %>%
-  group_by(cluster) %>%
-  summarise(across(everything(), mean, na.rm = TRUE))
-# Convert mean_expression to a matrix for heatmap
-mean_expression_matrix <- as.matrix(mean_expression[,-1])  # Remove cluster column
-rownames(mean_expression_matrix) <- mean_expression$cluster
-# Plot heatmap
-pheatmap(mean_expression_matrix, 
-         cluster_rows = TRUE, 
-         cluster_cols = TRUE, 
-         scale = "row", 
-         color = colorRampPalette(c("blue", "white", "red"))(50),
-         main = "Mean Gene Expression by Cluster")
-dev.copy(pdf, "LCNE_cells_clusters_filtered_gene_expr_heatmap.pdf", width = 14, height = 8)
-dev.off()
-
 ############################################################## Check spatial density and coherence of LC-NE clusters filtered cells ########################################################################
 # Clean up between processing steps
 clear_objects_except_functions()
 # Load data and stored UMAP info
-LCNE_barseq <- readRDS("LCNE_clusters_filtered_cpm_log_clust.rds")
+LCNE_barseq <- readRDS("LCNE_neurons_CCFv2_uid_cpm_log_clust.rds")
 
-umap_path <- "/scratch/BARseq_780345/analysis/barseq_LC_NE_clusters_filtered/umap.csv"
+umap_path <- "/scratch/BARseq_780346/analysis/barseq_LC_NE_cells/umap.csv"
 umap_df <- read.csv(umap_path, header = TRUE)
 
 #Compute kNN-based cluster purity: proportion of same-cluster neighbors.
@@ -915,7 +722,7 @@ umap_data <- reducedDim(new_barseq, "UMAP")
 total_genes <- colSums(counts(new_barseq))
 
 # Create plotting data frames
-plot_data_cluster <- data.frame(UMAP1 = umap_data[,1], UMAP2 = umap_data[2], cluster = factor(clusters[["label"]]))
+plot_data_cluster <- data.frame(UMAP1 = umap_data[,1], UMAP2 = umap_data[,2], cluster = factor(clusters[["label"]]))
 plot_data_genes <- data.frame(UMAP1 = umap_data[,1], UMAP2 = umap_data[,2], TotalGenes = total_genes)
 
 # Sort data for TotalGenes to plot higher values on top

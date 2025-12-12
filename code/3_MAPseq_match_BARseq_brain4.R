@@ -3,12 +3,12 @@
 # Identifies uniquely barcoded BARseq cells which have a match in the MAPseq dataset with 0,1,2,or 3 Hamming distance mismatches allowed
 
 #set working directory 
-setwd('/scratch/BARseq_780345/')
+setwd('/scratch/BARseq_780346/')
 ############################################################################################################################################################################################################
 # Sanity checks for QC of the MAPseq data
-UMI_filt <- read_tsv("/data/780345_2025-02-20_00-00-00/MAPseq/M295_20250729_USEthis/780345.nbcm.tsv")
-UMI_raw <- read_tsv("/data/780345_2025-02-20_00-00-00/MAPseq/M295_20250729_USEthis/780345.rbcm.tsv")
-UMI_spikein <- read_tsv("/data/780345_2025-02-20_00-00-00/MAPseq/M295_20250729_USEthis/780345.sbcm.tsv")
+UMI_filt <- read_tsv("/data/780346_2025-06-11_00-00-00/MAPseq/M305_20251030_USEthis/780346.nbcm1025.tsv")
+UMI_raw <- read_tsv("/data/780346_2025-06-11_00-00-00/MAPseq/M305_20251030_USEthis/780346.rbcm1025.tsv")
+UMI_spikein <- read_tsv("/data/780346_2025-06-11_00-00-00/MAPseq/M305_20251030_USEthis/780346.sbcm1025.tsv")
 
 # Process all three datasets
 UMI_filt <- UMI_filt %>%
@@ -58,14 +58,10 @@ colData(LCNEcluster)
 table(colData(LCNEcluster)$barcode)
 table(colData(LCNEcluster)$louvain_cluster)
 
-# LCNEneurons <-readRDS("LCNE_neurons_CCFv2_uid_cpm_log_clust.rds") - least conservative
-# LCNEneurons_clustfilt <-readRDS("LCNE_clusters_filtered_cpm_log_clust.rds")
-# LCNEneurons_clustfilt_spatialfilt <-readRDS("LCNE_clusters_filtered_coherence_filtered_cpm_log_clust.rds") - most conservative
-
 ############################################################################################################################################################################################################
 # Process barcode information for all barcoded cells from BARseq experiment and convert them to MAPseq basecalls format
 # Read CSV without column names, and name columns manually
-barcodes_raw <- read_csv("barcodes_BC_qc.csv", col_names = FALSE)
+barcodes_raw <- read_csv("barcodes_LC_subset_good_cells.csv", col_names = TRUE)
 # Rename for clarity
 colnames(barcodes_raw)[1] <- "CellID"
 colnames(barcodes_raw)[2:16] <- paste0("B", 1:15)  # Barcode positions
@@ -81,13 +77,13 @@ barcodes_raw$VBC <- apply(barseq_nuc, 1, paste0, collapse = "")
 head(barcodes_raw[, c("CellID", "VBC")])
 
 ############################################################################################################################################################################################################
-# Match the barcode sequences to cells in LCNE cluster based on uid
+# Match the barcode sequences to cells in LCNE cluster based on uid - dont rely on barcode=TRUE from the main file since threshold was updated later
 # Ensure 'uid' exists in barseq_raw
 if (!"CellID" %in% colnames(barcodes_raw)) {
   stop("No 'uid' column found in barseq_raw.")
 }
 # Extract 'uid' of all barcoded cells from LCNE cluster object
-good_uids <- colData(LCNEcluster)$uid[colData(LCNEcluster)$barcode == TRUE]
+good_uids <- colData(LCNEcluster)$uid
 # Subset barcodes_raw using the good 'uid'
 LC_barcoded_cells <- barcodes_raw[barcodes_raw$CellID %in% good_uids, ]
 # Check the number of rows in the subsetted object
@@ -101,7 +97,7 @@ rm(barcodes_raw, barseq_nuc)
 barseq <- LC_barcoded_cells
 
 # MapSeq input, truncate to first 15 characters to ensure that vector legnth is equivalent to BarSeq 15 cycles
-mapseq <- read_tsv("/data/780345_2025-02-20_00-00-00/MAPseq/M295_20250729_USEthis/780345.nbcm.tsv")
+mapseq <- read_tsv("/data/780346_2025-06-11_00-00-00/MAPseq/M305_20251030_USEthis/780346.nbcm1025.tsv")
 
 # Find which columns are logical (shouldn't be)
 logical_cols <- sapply(mapseq, is.logical)
@@ -284,37 +280,37 @@ print_and_save_duplicates(result_0, proj_0_nodup, "proj_0_duplicated_rows.csv")
 print_and_save_duplicates(result_1, proj_1_nodup, "proj_1_duplicated_rows.csv")
 print_and_save_duplicates(result_2, proj_2_nodup, "proj_2_duplicated_rows.csv")
 
-#####################################################################################################################################################################################
-# Only retain cells for genes vs projections processing which pass visual QC
-# Load visual QC info CSV 
-visualQC <- read.csv("LC_visualQC_barcoded_cells.csv", header = TRUE, stringsAsFactors = FALSE)
-# Check that the 'uid' column exists
-if (!"uid" %in% colnames(visualQC)) {
-  stop("No 'uid' column found in LC_visualQC_barcoded_cells.csv")
-}
+# #####################################################################################################################################################################################
+# # Only retain cells for genes vs projections processing which pass visual QC
+# # Load visual QC info CSV 
+# visualQC <- read.csv("LC_visualQC_barcoded_cells.csv", header = TRUE, stringsAsFactors = FALSE)
+# # Check that the 'uid' column exists
+# if (!"uid" %in% colnames(visualQC)) {
+#   stop("No 'uid' column found in LC_visualQC_barcoded_cells.csv")
+# }
+# 
+# # Get the list of uids where good_barcoded is TRUE
+# good_uids <- visualQC$uid[visualQC$good_barcoded == 1]
+# length(good_uids)
+# # Subset cells for analyses involving gene expression profiles plus projections
+# proj_0_GENES <- proj_0_nodup[proj_0_nodup$CellID %in% good_uids, ]
+# dim(proj_0_GENES)
+# result_0_GENES <- check_duplicates(proj_0_GENES)
+# 
+# proj_1_GENES <- proj_1_nodup[proj_1_nodup$CellID %in% good_uids, ]
+# dim(proj_1_GENES)
+# result_1_GENES <- check_duplicates(proj_1_GENES)
+# 
+# proj_2_GENES <- proj_2_nodup[proj_2_nodup$CellID %in% good_uids, ]
+# dim(proj_2_GENES)
+# result_2_GENES <- check_duplicates(proj_2_GENES)
+# 
+# # Save
+# write_csv(proj_0_GENES, "MapSeq_matched_projections_exact_GENES.csv")
+# write_csv(proj_1_GENES, "MapSeq_matched_projections_1_mismatch_GENES.csv")
+# write_csv(proj_2_GENES, "MapSeq_matched_projections_2_mismatch_GENES.csv")
 
-# Get the list of uids where good_barcoded is TRUE
-good_uids <- visualQC$uid[visualQC$good_barcoded == 1]
-length(good_uids)
-# Subset cells for analyses involving gene expression profiles plus projections
-proj_0_GENES <- proj_0_nodup[proj_0_nodup$CellID %in% good_uids, ]
-dim(proj_0_GENES)
-result_0_GENES <- check_duplicates(proj_0_GENES)
-
-proj_1_GENES <- proj_1_nodup[proj_1_nodup$CellID %in% good_uids, ]
-dim(proj_1_GENES)
-result_1_GENES <- check_duplicates(proj_1_GENES)
-
-proj_2_GENES <- proj_2_nodup[proj_2_nodup$CellID %in% good_uids, ]
-dim(proj_2_GENES)
-result_2_GENES <- check_duplicates(proj_2_GENES)
-
-# Save
-write_csv(proj_0_GENES, "MapSeq_matched_projections_exact_GENES.csv")
-write_csv(proj_1_GENES, "MapSeq_matched_projections_1_mismatch_GENES.csv")
-write_csv(proj_2_GENES, "MapSeq_matched_projections_2_mismatch_GENES.csv")
-
-
+# still need to implement this section by checking selected cells and their segmentation - check with Mara
 #####################################################################################################################################################################################
 # FPR calculation to select optiomal Hamming distance for matching
 # ---------------- SETTINGS ----------------
@@ -464,3 +460,87 @@ p <- ggplot(comparison_df, aes(x = Mismatches, y = Avg_Random_Matches_Per_BarSeq
   theme_minimal()
 print(p)
 ggsave("BarSeq-MapSeq_FPR.pdf", plot = p, device = "pdf", width = 6, height = 6)  
+
+#####################################################################################################################################################################################
+# Shuffled BarSeq Data Simulation for FPR estimation
+# Function to shuffle barcode keeping 9th nucleotide fixed
+shuffle_barcode <- function(vbc) {
+  chars <- strsplit(vbc, "")[[1]]
+  fixed <- chars[9]
+  others <- chars[-9]
+  shuffled_others <- sample(others)
+  new_chars <- chars
+  new_chars[-9] <- shuffled_others
+  paste0(new_chars, collapse = "")
+}
+
+# Run Shuffled Matching Simulation
+run_shuffled_matching_simulation <- function(n_simulations, barseq_df, mapseq_split, mapseq_vbcs, max_mismatches) {
+  shuffled_results <- list()
+  
+  for (sim in seq_len(n_simulations)) {
+    cat("Running shuffled simulation", sim, "of", n_simulations, "\n")
+    
+    # Shuffle barcodes
+    shuffled_barcodes <- sapply(barseq_df$VBC, shuffle_barcode)
+    shuffled_df <- data.frame(CellID = barseq_df$CellID, VBC = shuffled_barcodes)
+    
+    # Run matching for each mismatch threshold
+    matches_0 <- match_in_batches(shuffled_df, mapseq_split, mapseq_vbcs, max_dist = 0)
+    matches_1 <- match_in_batches(shuffled_df, mapseq_split, mapseq_vbcs, max_dist = 1)
+    matches_2 <- match_in_batches(shuffled_df, mapseq_split, mapseq_vbcs, max_dist = 2)
+    matches_3 <- match_in_batches(shuffled_df, mapseq_split, mapseq_vbcs, max_dist = 3)
+    
+    # Store results
+    shuffled_results[[sim]] <- list(
+      matches_0 = nrow(matches_0),
+      matches_1 = nrow(matches_1),
+      matches_2 = nrow(matches_2),
+      matches_3 = nrow(matches_3)
+    )
+  }
+  
+  return(shuffled_results)
+}
+
+# Run shuffled simulations
+if (file.exists("shuffled_simulation_results.rds")) {
+  shuffled_results <- readRDS("shuffled_simulation_results.rds")
+} else {
+  shuffled_results <- run_shuffled_matching_simulation(n_simulations, barseq, mapseq_split, mapseq_vbcs, max_mismatches)
+  saveRDS(shuffled_results, file = "shuffled_simulation_results.rds")
+}
+
+# Summarize Shuffled Results (reuse the summarize_random_results function)
+shuffled_means <- summarize_random_results(shuffled_results, n_simulations)
+
+# Calculate Error Rates for shuffled
+shuffled_error_rates <- calculate_error_rates(shuffled_means, n_barseq)
+
+# Construct shuffled_comparison_df
+shuffled_comparison_df <- data.frame(
+  Mismatches = 0:max_mismatches,
+  Real_Matches = real_match_counts,
+  Shuffled_Mean_Matches = round(shuffled_means),
+  Shuffled_Error_Rate = round(shuffled_error_rates, 4)
+)
+shuffled_comparison_df$Avg_Shuffled_Matches_Per_BarSeq <- round(shuffled_means / n_barseq, 3)
+
+# Print the shuffled_comparison_df
+print(shuffled_comparison_df)
+
+# Save shuffled_comparison_df to a CSV file
+write.csv(shuffled_comparison_df, file = "shuffled_comparison_df_FPR_error.csv", row.names = FALSE)
+
+# Visualize Results
+p_shuf <- ggplot(shuffled_comparison_df, aes(x = Mismatches, y = Avg_Shuffled_Matches_Per_BarSeq)) +
+  geom_line(color = "red", linewidth = 1) +
+  geom_point(color = "red", size = 2) +
+  labs(
+    title = "Shuffled Match Rate per BarSeq Match",
+    x = "Allowed Mismatches",
+    y = "Avg Shuffled Matches per BarSeq"
+  ) +
+  theme_minimal()
+print(p_shuf)
+ggsave("BarSeq-MapSeq_Shuffled_FPR.pdf", plot = p_shuf, device = "pdf", width = 6, height = 6)

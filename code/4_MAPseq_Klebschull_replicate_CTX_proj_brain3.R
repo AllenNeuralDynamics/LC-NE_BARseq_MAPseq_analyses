@@ -53,6 +53,12 @@ df$louvain_cluster <- as.character(df$louvain_cluster)
 df$row_id <- paste(df$CellID, df$louvain_cluster, sep=".")
 rownames(df) <- make.unique(df$row_id)
 head(df)
+
+#check for non-unique cells based on CellID.louvain_cluster.unique pattern and count how many there are
+rn <- rownames(df)
+dot_counts <- lengths(regmatches(rn, gregexpr("\\.", rn)))
+table(dot_counts)
+
 df <- df[, !(colnames(df) %in% c("CellID", "dist", "vbc_read", "louvain_cluster", "row_id"))]
 print(colnames(df))
 
@@ -321,6 +327,537 @@ compare_full_profiles(dup_ctx, df)
 compare_full_profiles(dup_RH, df)
 compare_full_profiles(dup_LH, df)
 
+# Check for duplicates only based on counts entries ignoring the matadatahead(full_proj_df)
+exclude_cols <- c("slice", "barcode", "CCF_AP", "CCF_DV", "CCF_ML", "inRH")
+full_proj_df <- df[, !(colnames(df) %in% exclude_cols)]
+compare_full_profiles(dup_ctx, full_proj_df)
+compare_full_profiles(dup_RH, full_proj_df)
+compare_full_profiles(dup_LH, full_proj_df)
+
+#####################################################################################################################################################################################
+#####################################################################################################################################################################################
+# Identify duplicate cells across the entire projection table - aka cells which have different metadata, but identical MAPseq profiles across all regions
+head(full_proj_df)
+proj_matrix <- as.data.frame(full_proj_df)
+profile_hash <- apply(proj_matrix, 1, function(x) digest(x, algo = "md5"))
+hash_tab <- table(profile_hash)
+# number of groups with at least 2 identical rows
+n_duplicate_groups <- sum(hash_tab > 1)
+# total number of *extra* duplicated rows (beyond 1 per group)
+n_extra_duplicate_rows <- sum(hash_tab[hash_tab > 1] - 1)
+n_duplicate_groups
+n_extra_duplicate_rows
+dup_hashes <- names(hash_tab)[hash_tab > 1]
+dup_df <- data.frame(
+  CellID = rownames(proj_matrix),
+  profile_hash = profile_hash,
+  stringsAsFactors = FALSE
+)
+dup_df <- dup_df[dup_df$profile_hash %in% dup_hashes, ]
+# inspect groups
+dup_groups <- split(dup_df$CellID, dup_df$profile_hash)
+dup_groups
+
+# Function to compute Euclidean distance between two points in 3D
+euclidean_distance <- function(coord1, coord2) {
+  sqrt(sum((coord1 - coord2)^2))
+}
+# Function to compute pairwise distances for a group of cells
+compute_group_distances <- function(cell_ids, df) {
+  # Extract CCF coordinates for the cells
+  coords <- df[cell_ids, c("CCF_AP", "CCF_DV", "CCF_ML")]
+  # Get all pairs
+  pairs <- combn(cell_ids, 2, simplify = FALSE)
+  # Compute distances for each pair
+  distances <- sapply(pairs, function(pair) {
+    coord1 <- as.numeric(coords[pair[1], ])
+    coord2 <- as.numeric(coords[pair[2], ])
+    euclidean_distance(coord1, coord2)
+  })
+  
+  # Create a data frame for the results
+  pair_df <- do.call(rbind, lapply(pairs, function(p) data.frame(cell1 = p[1], cell2 = p[2])))
+  pair_df$distance_voxels <- distances
+  pair_df$distance_microns <- distances * 25  # Assuming 25um per voxel
+  return(pair_df)
+}
+
+# Compute distances for all duplicate groups
+all_distances <- lapply(names(dup_groups), function(hash) {
+  cells <- dup_groups[[hash]]
+  if (length(cells) > 1) {
+    dist_df <- compute_group_distances(cells, df)
+    dist_df$group_hash <- hash
+    return(dist_df)
+  } else {
+    return(NULL)
+  }
+})
+# Combine into a single data frame
+distance_table <- do.call(rbind, all_distances)
+# View the table
+print(distance_table)
+
+# Sanity check: Print CCF coordinates for each pair to verify distances
+sanity_check <- function(distance_table, df) {
+  check_df <- data.frame()
+  for (i in 1:nrow(distance_table)) {
+    cell1 <- distance_table$cell1[i]
+    cell2 <- distance_table$cell2[i]
+    coord1 <- df[cell1, c("CCF_AP", "CCF_DV", "CCF_ML")]
+    coord2 <- df[cell2, c("CCF_AP", "CCF_DV", "CCF_ML")]
+    temp_df <- data.frame(
+      group_hash = distance_table$group_hash[i],
+      cell1 = cell1,
+      AP1 = coord1$CCF_AP, DV1 = coord1$CCF_DV, ML1 = coord1$CCF_ML,
+      cell2 = cell2,
+      AP2 = coord2$CCF_AP, DV2 = coord2$CCF_DV, ML2 = coord2$CCF_ML,
+      distance_voxels = distance_table$distance_voxels[i],
+      distance_microns = distance_table$distance_microns[i]
+    )
+    check_df <- rbind(check_df, temp_df)
+  }
+  return(check_df)
+}
+sanity_table <- sanity_check(distance_table, df)
+print(sanity_table)
+write.csv(sanity_table, "duplicate_positions_sanity_table.csv")
+
+library(ggrepel)
+# Build a plotting table for all duplicate groups
+plot_df <- lapply(names(dup_groups), function(hash) {
+  cells <- dup_groups[[hash]]
+  
+  df_subset <- df[cells, c("CCF_ML", "CCF_DV", "CCF_AP")]
+  df_subset$CellID <- rownames(df_subset)
+  df_subset$group_hash <- hash
+  
+  df_subset
+}) %>% bind_rows()
+
+# Factor ensures consistent facet ordering
+plot_df$group_hash <- factor(plot_df$group_hash)
+
+# Modify plot_df to add a color column based on cell order within each group
+plot_df <- plot_df %>%
+  group_by(group_hash) %>%
+  mutate(cell_order = row_number(),
+         color = ifelse(cell_order == 1, "green", "red")) %>%
+  ungroup()
+
+# Updated plot with ggrepel for non-overlapping labels and colored points
+p <- ggplot(plot_df, aes(x = CCF_ML, y = CCF_DV, label = CellID, color = color)) +
+  geom_point(size = 2) +
+  geom_text_repel(nudge_y = 15, size = 2.4, show.legend = FALSE) +  # Use repel for better label placement
+  scale_color_manual(values = c("green", "red")) +
+  facet_wrap(~ group_hash) +
+  theme_minimal() +
+  labs(
+    title = "Duplicate-cell groups in coronal plane (ML × DV)",
+    x = "CCF ML (medial–lateral)",
+    y = "CCF DV (dorsal–ventral)",
+    color = "Cell Order"
+  ) +
+  coord_fixed() +
+  theme(legend.position = "bottom")  # Optional: move legend to bottom
+
+print(p)
+ggsave("duplicate_cells_coronal_plane_plot.pdf", p, width = 12, height = 10)
+
+#####################################################################################################################################################################################
+#####################################################################################################################################################################################
+# Set up filtering to get rid of duplicate cells by checking gene expression and segmentation accuracy
+# Load segmentation QC data
+good_cells <- read.csv("LC_visualQC_barcoded_cells.csv")
+good_uids <- good_cells$uid[good_cells$good_barcoded == 1]  # UIDs of good cells
+bad_uids <- good_cells$uid[good_cells$good_barcoded == 0]   # UIDs of badly segmented cells
+# Quick summary
+cat("Total cells in QC file:", nrow(good_cells), "\n")
+cat("Good segmented cells (good_barcoded == 1):", length(good_uids), "\n")
+cat("Badly segmented cells (good_barcoded == 0):", length(bad_uids), "\n")
+head(good_cells)  # Inspect structure
+
+# Function to extract base UID from df row names (e.g., "11_43_1941753.4" -> "11_43_1941753")
+get_base_uid <- function(cell_id) {
+  sub("\\.[0-9]+$", "", cell_id)
+}
+
+# Function to check segmentation quality for a group of cells
+check_segmentation <- function(cells) {
+  results <- data.frame(
+    CellID = cells,
+    Base_UID = sapply(cells, get_base_uid),
+    stringsAsFactors = FALSE
+  )
+  
+  # Check status
+  results$Segmentation_Status <- sapply(results$Base_UID, function(uid) {
+    if (uid %in% good_cells$uid) {
+      if (good_cells$good_barcoded[good_cells$uid == uid] == 1) {
+        "Good"
+      } else {
+        "Bad (badly segmented)"
+      }
+    } else {
+      "Not found in QC list"
+    }
+  })
+  
+  return(results)
+}
+
+# Apply to all duplicate groups and print summaries
+for (hash in names(dup_groups)) {
+  cells <- dup_groups[[hash]]
+  seg_check <- check_segmentation(cells)
+  
+  cat("\nGroup Hash:", hash, "\n")
+  cat("Cells in group:", length(cells), "\n")
+  print(seg_check)  # Shows CellID, Base_UID, Segmentation_QC
+  
+  # Summary for group
+  n_good <- sum(seg_check$Segmentation_QC == "Good")
+  n_bad <- sum(seg_check$Segmentation_QC == "Bad")
+  cat("Good segmented:", n_good, "| Bad segmented:", n_bad, "\n")
+}
+
+# Function to get transcriptomic metrics for a base UID
+get_transcriptomic_metrics <- function(base_uid) {
+  if (base_uid %in% colnames(LCNEneurons)) {
+    expr <- assay(LCNEneurons, "logcounts")[, base_uid]  # Or "counts" if preferred
+    total_umis <- sum(expr)
+    sparsity <- mean(expr == 0)  # Fraction of zero genes
+    return(list(total_umis = round(total_umis, 2), sparsity = round(sparsity, 3)))
+  } else {
+    return(list(total_umis = NA, sparsity = NA))  # If missing (though unlikely now)
+  }
+}
+
+# Function to check transcriptomic properties for a group of cells
+check_transcriptomics <- function(cells) {
+  results <- data.frame(
+    CellID = cells,
+    Base_UID = sapply(cells, get_base_uid),
+    stringsAsFactors = FALSE
+  )
+  
+  trans_metrics <- lapply(results$Base_UID, get_transcriptomic_metrics)
+  results$Total_UMIs <- sapply(trans_metrics, `[[`, "total_umis")
+  results$Sparsity <- sapply(trans_metrics, `[[`, "sparsity")
+  
+  return(results)
+}
+
+# Initialize a list to collect all combined data
+all_group_data <- list()
+# Apply to all duplicate groups and collect data
+for (hash in names(dup_groups)) {
+  cells <- dup_groups[[hash]]
+  # Segmentation check
+  seg_check <- check_segmentation(cells)
+  # Transcriptomic check
+  trans_check <- check_transcriptomics(cells)
+  # Merge results
+  combined <- merge(seg_check, trans_check, by = c("CellID", "Base_UID"))
+  combined$Group_Hash <- hash  # Add group hash
+  # Collect
+  all_group_data[[hash]] <- combined
+  # Optional: Still print for visibility (or comment out if not needed)
+  cat("\nGroup Hash:", hash, "\n")
+  cat("Cells in group:", length(cells), "\n")
+  print(combined)
+  # Summary
+  n_good <- sum(combined$Segmentation_Status == "Good")
+  n_bad <- sum(grepl("Bad", combined$Segmentation_Status))
+  avg_umis <- mean(combined$Total_UMIs, na.rm = TRUE)
+  avg_sparsity <- mean(combined$Sparsity, na.rm = TRUE)
+  cat("Good segmented:", n_good, "| Bad segmented:", n_bad, "\n")
+  cat("Avg Total UMIs:", round(avg_umis, 2), "| Avg Sparsity:", round(avg_sparsity, 3), "\n")
+}
+# Combine all into one data frame
+full_data <- do.call(rbind, all_group_data)
+# Reorder columns: Group_Hash first, then CellID, etc.
+full_data <- full_data[, c("Group_Hash", "CellID", "Base_UID", "Segmentation_Status", "Total_UMIs", "Sparsity")]
+head(full_data)
+# Save to CSV
+write.csv(full_data, "duplicate_groups_detailed.csv", row.names = FALSE)
+
+# Hardcoded manual annotations: Named vectors for CellID -> Doublet_status and Final_selection
+# Based on duplicate_groups_detailed.csv. Keys are CellID.
+manual_doublet_status <- c(
+  "8_31_2090907.2" = "different",
+  "8_32_2830306.2" = "different",
+  "4_15_2070738.2" = "different",
+  "5_20_3041537.2" = "different",
+  "4_15_2062698.2" = "same",
+  "4_15_2070373.2" = "same",
+  "10_40_2990474.2" = "different",
+  "11_41_411555.2" = "different",
+  "4_15_2070418.1" = "different",
+  "4_15_2070454.1" = "different",
+  "5_18_1171078.1" = "same",
+  "5_18_1281549.1" = "same",
+  "8_32_2830801.2" = "different",
+  "9_33_380851.3" = "different",
+  "8_32_2851482.2" = "different",
+  "9_33_401315.3" = "different",
+  "7_28_2821312.2" = "different",
+  "7_28_2821373.1" = "different",
+  "7_28_2821508.1" = "different",
+  "8_29_401334.2" = "different",
+  "8_32_2830497.2" = "different",
+  "9_33_380518.2" = "different",
+  "4_15_2041648.1" = "same",
+  "4_15_2050065.1" = "same",
+  "7_25_490685.1" = "same",
+  "7_25_600600.1" = "same",
+  "7_27_1920486.3" = "same",
+  "7_27_1920510.4" = "same",
+  "7_26_1150838.2" = "same",
+  "7_26_1260688.2" = "same",
+  "9_34_1150563.3" = "same",
+  "9_34_1260923.3" = "same",
+  "4_14_1262601.1" = "same",
+  "4_14_1270135.1" = "same",
+  "6_23_2140807.3" = "same",
+  "6_23_2140835.2" = "same",
+  "8_31_2091464.2" = "different",
+  "8_31_2091500.1" = "different",
+  "8_32_2830413.2" = "different",
+  "9_33_380414.2" = "different",
+  "5_20_2930892.2" = "same",
+  "5_20_3041465.2" = "same",
+  "8_30_1252120.2" = "same",
+  "8_30_1252159.2" = "different",
+  "8_30_1260348.2" = "same",
+  "7_28_2711027.1" = "same",
+  "7_28_2821459.1" = "same",
+  "9_35_2030623.3" = "same",
+  "9_35_2140648.3" = "same",
+  "7_28_2711015.2" = "same",
+  "7_28_2821437.2" = "same",
+  "6_23_2140720.3" = "different",
+  "6_23_2140766.3" = "different",
+  "9_34_1261075.4" = "different",
+  "9_36_3020420.3" = "same",
+  "9_36_3020446.2" = "same",
+  "10_37_531576.2" = "same",
+  "10_37_531614.1" = "same",
+  "5_18_1151167.1" = "same",
+  "5_18_1261195.1" = "same",
+  "10_37_431981.3" = "different",
+  "9_36_2931155.4" = "different",
+  "7_28_2821421.3" = "same",
+  "7_28_2821422.2" = "same",
+  "5_19_2050258.2" = "different",
+  "5_20_2930893.2" = "different",
+  "7_27_1941414.4" = "different",
+  "7_28_2710983.3" = "different",
+  "8_32_2830707.3" = "different",
+  "9_33_380727.3" = "different",
+  "3_9_422479.2" = "same",
+  "3_9_430117.2" = "same",
+  "8_30_1170983.3" = "same",
+  "8_30_1281220.3" = "same",
+  "7_27_1941182.2" = "same",
+  "7_27_2051166.2" = "same",
+  "6_23_2161258.2" = "same",
+  "6_23_2271256.2" = "same",
+  "9_35_2030762.2" = "different",
+  "9_36_3020586.2" = "different",
+  "4_15_2070788.2" = "different",
+  "4_16_2870328.2" = "different",
+  "4_16_2870379.1" = "different",
+  "7_28_2910314.3" = "same",
+  "7_28_2910326.4" = "same",
+  "8_30_1260420.2" = "different",
+  "8_31_2091178.2" = "same",
+  "8_31_2091185.2" = "same",
+  "8_31_2091501.3" = "same",
+  "8_31_2091504.2" = "same",
+  "7_27_1920941.1" = "same",
+  "7_27_1920966.1" = "same",
+  "6_23_2140500.2" = "same",
+  "6_23_2250311.2" = "same",
+  "4_16_2862469.2" = "same",
+  "4_16_2870170.2" = "same",
+  "9_36_3012198.3" = "same",
+  "9_36_3020367.3" = "same",
+  "4_15_1950465.1" = "same",
+  "4_15_2050272.1" = "same",
+  "8_31_2091124.1" = "different",
+  "8_31_2091237.1" = "different",
+  "9_35_2051075.2" = "same",
+  "9_35_2161418.2" = "same",
+  "8_31_2091040.3" = "different",
+  "8_32_2830407.2" = "different",
+  "8_32_2830438.2" = "different",
+  "5_20_2910930.2" = "same",
+  "5_20_3020655.2" = "same",
+  "4_16_2862423.2" = "same",
+  "4_16_2870131.1" = "same",
+  "7_27_1941564.2" = "different",
+  "7_28_2821550.3" = "different",
+  "4_16_2741557.1" = "same",
+  "4_16_2840439.1" = "same",
+  "8_29_380682.2" = "different",
+  "8_30_1260524.2" = "different",
+  "8_29_401301.2" = "same",
+  "8_29_511330.2" = "same",
+  "8_30_1281242.2" = "different",
+  "8_31_2112460.3" = "different",
+  "9_36_3012056.2" = "different",
+  "9_36_3020251.2" = "different",
+  "3_12_2340641.1" = "same",
+  "3_12_2340642.2" = "same"
+)
+
+manual_final_selection <- c(
+  "8_31_2090907.2" = "discard",
+  "8_32_2830306.2" = "discard",
+  "4_15_2070738.2" = "discard",
+  "5_20_3041537.2" = "discard",
+  "4_15_2062698.2" = "discard",
+  "4_15_2070373.2" = "keep",
+  "10_40_2990474.2" = "discard",
+  "11_41_411555.2" = "discard",
+  "4_15_2070418.1" = "discard",
+  "4_15_2070454.1" = "discard",
+  "5_18_1171078.1" = "discard",
+  "5_18_1281549.1" = "keep",
+  "8_32_2830801.2" = "discard",
+  "9_33_380851.3" = "discard",
+  "8_32_2851482.2" = "discard",
+  "9_33_401315.3" = "discard",
+  "7_28_2821312.2" = "discard",
+  "7_28_2821373.1" = "keep",
+  "7_28_2821508.1" = "discard",
+  "8_29_401334.2" = "discard",
+  "8_32_2830497.2" = "discard",
+  "9_33_380518.2" = "discard",
+  "4_15_2041648.1" = "discard",
+  "4_15_2050065.1" = "keep",
+  "7_25_490685.1" = "discard",
+  "7_25_600600.1" = "keep",
+  "7_27_1920486.3" = "discard",
+  "7_27_1920510.4" = "keep",
+  "7_26_1150838.2" = "discard",
+  "7_26_1260688.2" = "keep",
+  "9_34_1150563.3" = "discard",
+  "9_34_1260923.3" = "keep",
+  "4_14_1262601.1" = "keep",
+  "4_14_1270135.1" = "discard",
+  "6_23_2140807.3" = "keep",
+  "6_23_2140835.2" = "discard",
+  "8_31_2091464.2" = "discard",
+  "8_31_2091500.1" = "discard",
+  "8_32_2830413.2" = "discard",
+  "9_33_380414.2" = "discard",
+  "5_20_2930892.2" = "discard",
+  "5_20_3041465.2" = "keep",
+  "8_30_1252120.2" = "discard",
+  "8_30_1252159.2" = "discard",
+  "8_30_1260348.2" = "discard",
+  "7_28_2711027.1" = "keep",
+  "7_28_2821459.1" = "discard",
+  "9_35_2030623.3" = "discard",
+  "9_35_2140648.3" = "discard",
+  "7_28_2711015.2" = "discard",
+  "7_28_2821437.2" = "keep",
+  "6_23_2140720.3" = "discard",
+  "6_23_2140766.3" = "discard",
+  "9_34_1261075.4" = "keep",
+  "9_36_3020420.3" = "discard",
+  "9_36_3020446.2" = "discard",
+  "10_37_531576.2" = "discard",
+  "10_37_531614.1" = "keep",
+  "5_18_1151167.1" = "discard",
+  "5_18_1261195.1" = "keep",
+  "10_37_431981.3" = "discard",
+  "9_36_2931155.4" = "discard",
+  "7_28_2821421.3" = "discard",
+  "7_28_2821422.2" = "keep",
+  "5_19_2050258.2" = "discard",
+  "5_20_2930893.2" = "discard",
+  "7_27_1941414.4" = "discard",
+  "7_28_2710983.3" = "discard",
+  "8_32_2830707.3" = "discard",
+  "9_33_380727.3" = "discard",
+  "3_9_422479.2" = "discard",
+  "3_9_430117.2" = "keep",
+  "8_30_1170983.3" = "keep",
+  "8_30_1281220.3" = "discard",
+  "7_27_1941182.2" = "keep",
+  "7_27_2051166.2" = "discard",
+  "6_23_2161258.2" = "discard",
+  "6_23_2271256.2" = "keep",
+  "9_35_2030762.2" = "keep",
+  "9_36_3020586.2" = "discard",
+  "4_15_2070788.2" = "discard",
+  "4_16_2870328.2" = "discard",
+  "4_16_2870379.1" = "discard",
+  "7_28_2910314.3" = "keep",
+  "7_28_2910326.4" = "discard",
+  "8_30_1260420.2" = "discard",
+  "8_31_2091178.2" = "discard",
+  "8_31_2091185.2" = "discard",
+  "8_31_2091501.3" = "discard",
+  "8_31_2091504.2" = "discard",
+  "7_27_1920941.1" = "keep",
+  "7_27_1920966.1" = "discard",
+  "6_23_2140500.2" = "discard",
+  "6_23_2250311.2" = "keep",
+  "4_16_2862469.2" = "keep",
+  "4_16_2870170.2" = "discard",
+  "9_36_3012198.3" = "discard",
+  "9_36_3020367.3" = "discard",
+  "4_15_1950465.1" = "discard",
+  "4_15_2050272.1" = "keep",
+  "8_31_2091124.1" = "discard",
+  "8_31_2091237.1" = "discard",
+  "9_35_2051075.2" = "discard",
+  "9_35_2161418.2" = "keep",
+  "8_31_2091040.3" = "discard",
+  "8_32_2830407.2" = "discard",
+  "8_32_2830438.2" = "discard",
+  "5_20_2910930.2" = "keep",
+  "5_20_3020655.2" = "discard",
+  "4_16_2862423.2" = "discard",
+  "4_16_2870131.1" = "keep",
+  "7_27_1941564.2" = "discard",
+  "7_28_2821550.3" = "discard",
+  "4_16_2741557.1" = "discard",
+  "4_16_2840439.1" = "keep",
+  "8_29_380682.2" = "discard",
+  "8_30_1260524.2" = "discard",
+  "8_29_401301.2" = "discard",
+  "8_29_511330.2" = "keep",
+  "8_30_1281242.2" = "discard",
+  "8_31_2112460.3" = "discard",
+  "9_36_3012056.2" = "discard",
+  "9_36_3020251.2" = "discard",
+  "3_12_2340641.1" = "discard",
+  "3_12_2340642.2" = "keep"
+)
+
+# Add to full_data using CellID lookup
+full_data$Doublet_status <- manual_doublet_status[full_data$CellID]
+full_data$Doublet_status <- ifelse(is.na(full_data$Doublet_status), "not_reviewed", full_data$Doublet_status)
+
+full_data$Final_selection <- manual_final_selection[full_data$CellID]
+full_data$Final_selection <- ifelse(is.na(full_data$Final_selection), "keep", full_data$Final_selection)
+
+# Validation
+cat("Doublet_status counts:", paste(names(table(full_data$Doublet_status)), table(full_data$Doublet_status), collapse = ", "), "\n")
+cat("Final_selection counts:", paste(names(table(full_data$Final_selection)), table(full_data$Final_selection), collapse = ", "), "\n")
+
+# Generate blacklist from manual selections
+manual_blacklist <- full_data$CellID[full_data$Final_selection == "discard"]
+blacklist_df <- data.frame(row_name = manual_blacklist)
+write.csv(blacklist_df, "duplicate_blacklist_informed_final.csv", row.names = FALSE)
+
+#####################################################################################################################################################################################
+#####################################################################################################################################################################################
 # Estimate how many duplicates can be expected by chance
 simulate_duplicate_probability_sparse <- function(N = 517, K = 20, 
                                                   p_zero = 0.95, 

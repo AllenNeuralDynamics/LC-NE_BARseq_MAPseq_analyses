@@ -1,22 +1,12 @@
-library(tidyverse)
-library(viridis)
-library(pheatmap)
-library(grid)
-library(RColorBrewer)
-library(ggplot2)
-library(gplots)
+# Load functions which handle pre-processing or organizing of the data
+source("~/capsule/code/01_loaders_brain3.R")
 
-setwd('/Users/polina.kosillo/Seurat_projects/BarSeq/780345_full_brain_dataset')
-source("loaders_brain3_v3.R")
-
-# setwd('/Users/polina.kosillo/Seurat_projects/BarSeq/780346_full_brain_dataset')
-# source("loaders_brain4.R")
+#set working directory 
+setwd('/scratch/BARseq_780345/')
 
 dat <- load_data()
 names(dat)
 raw_matrix <- dat$proj_matrix_raw           # Raw counts 
-#log_matrix <- dat$mat_log_ordered          # Log-transformed 
-#rownorm_matrix <- dat$mat_rownorm_ordered  # Row-normalized 
 inRH_info <- dat$inRH_lookup               # Hemisphere lookup
 metadata <- dat$metadata                   # Cell metadata
 
@@ -25,64 +15,8 @@ cat("Metadata dimensions:", dim(metadata), "\n")
 
 # Convert projection matrices to ipsi-contra format
 ipsi_contra_raw <- create_ipsi_contra_from_raw(dat$proj_matrix_raw, dat$inRH_lookup)
-#ipsi_contra_log <- create_ipsi_contra_from_log(dat$mat_log_ordered, dat$inRH_lookup)
-#ipsi_contra_rownorm <- create_ipsi_contra_from_rownorm(dat$mat_rownorm_ordered, dat$inRH_lookup)
-
-###################### Only use ipsilateral data ##########################
-# # Only keep 'ipsi' or 'sp.cord' columns, drop contralateral data
-# ipsi_df <- ipsi_contra_raw[, grepl("ipsi|sp.cord", colnames(ipsi_contra_raw))]
-# # Remove '-ipsi' from column names
-# colnames(ipsi_df) <- gsub("-ipsi", "", colnames(ipsi_df))
-# colnames(ipsi_df)
-# 
-# region_map <- list(
-#   OLF = c("olf.bulb", "olf.bulb.1", "AON"),
-#   Isocortex = c("motor.ctx", "orb.ctx", "ctx.1", "ctx.2", "ctx.3", "ctx.1.1", "ctx.2.1", "ctx.3.1", "ctx.1.2", "ctx.2.2", "ctx.3.2", "ctx.2.3", "ctx.3.3", "cc", "cc.1", "cc.2"),
-#   HPF = c("hippocampus", "hippocampus.1"),
-#   CTXsp = c("ctx.1.3", "amyg.GPe", "ctx.1.4", "amygdala"),
-#   CNU = c("CPu", "septum", "NAc", "CPu.1", "septum.1", "NAc.1", "CPu.2", "septum.2", "BNST"),
-#   TH = c("thalamus","thalamus.1"),
-#   HY = c("hypothalamus", "hypothalamus.1"),
-#   MB = c("midbrain", "midbrain.1", "midbrain.2"),
-#   CB = c("cerebellum"),
-#   P = c( "hindbrain", "hindbrain.1", "hindbrain.2"),
-#   MY = c("medulla"),
-#   SP = c( "sp.cord.1_SP", "sp.cord.2_SP", "sp.cord.3_SP")
-# )
-
-# region_map <- list(
-#   OLF = c("olf.bulb", "olf.bulb.1", "AON", "AON.1"),
-#   Isocortex = c("motor.ctx", "orb.ctx", "ctx.1", "ctx.2", "ctx.3", "ctx.1.1", "ctx.2.1", "ctx.3.1", "ctx.1.2", "ctx.2.2", "ctx.3.2", "ctx.2.3", "ctx.3.3", "cc", "cc.1", "ctx.3.4", "ctx.2.4", "ctx.1.4", "ctx.3.5", "ctx" ),
-#   HPF = c("hippocampus", "hippocampus.1", "hippocampus.2"),
-#   CTXsp = c("ctx.1.3", "amyg.GPe", "ctx.1.4", "amygdala"),
-#   CNU = c("CPu", "septum", "NAc", "CPu.1", "septum.1", "NAc.1", "CPu.2", "septum.2", "BNST"),
-#   TH = c("thalamus","thalamus.1"),
-#   HY = c("hypothalamus", "hypothalamus.1"), 
-#   MB = c("midbrain", "midbrain.1", "midbrain.2"), 
-#   CB = c("cerebellum.I", "cerebellum.II"),
-#   P = c( "hindbrain", "hindbrain.1", "hindbrain.2"),
-#   MY = c("medulla", "medulla.1"),
-#   SP = c( "sp.cord.1_SP", "sp.cord.2_SP", "sp.cord.3_SP")
-# )
-
-# # Initialize an empty data frame for the combined regions
-# combined_df <- data.frame(matrix(ncol = length(region_map), nrow = nrow(ipsi_df)))
-# colnames(combined_df) <- names(region_map)
-# rownames(combined_df) <- rownames(ipsi_df)
-# # Sum the values for each region group based on region_map
-# for (region in names(region_map)) {
-#   matching_cols <- intersect(region_map[[region]], colnames(ipsi_df))  # Ensure columns exist in the data
-#   if (length(matching_cols) > 0) {
-#     combined_df[[region]] <- rowSums(ipsi_df[, matching_cols, drop = FALSE], na.rm = TRUE)
-#   } else {
-#     combined_df[[region]] <- 0  # If no matching columns, assign zero
-#   }
-# }
-# # View the combined data frame
-# head(combined_df)
 
 # Working with combined ipsilateral and contralateral matrices
-# Work with the full dataframe (keeping original column names)
 full_df <- ipsi_contra_raw
 
 # Function to extract base region name from column names (for matching only)
@@ -135,7 +69,6 @@ for (region in names(region_map)) {
   ]
   cat("Region", region, "includes:", paste(matching_cols, collapse = ", "), "\n")
 }
-
 
 # Normalize each row by its sum (row-wise normalization)
 normalized_df <- combined_df / rowSums(combined_df)
@@ -274,3 +207,4 @@ cell_top_projections_with_coords <- merge(
 # View the result
 head(cell_top_projections_with_coords)
 write.csv(cell_top_projections_with_coords, "cell_top_projections_with_coords.csv", row.names = FALSE)
+
