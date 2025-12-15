@@ -36,19 +36,41 @@ load_data <-function() {
   cell_metadata <- as.data.frame(colData(LCNEneurons))
   
   # Load sample information
-  proj_index <- readr::read_tsv("sampleinfo.tsv")
-  sampleinfo <- read_excel("/data/780345_2025-02-20_00-00-00/MAPseq/M295_20250729_USEthis/M295_20250721.sampleinfo.xlsx", sheet = "Sample information")
-  colnames(sampleinfo) <- c("usertube", "ourtube", "samplename", "siteinfo", "QC_qPCR", "rtprimer", "brain")
-  proj_index$MapSeqV1_tube <- sampleinfo$rtprimer[match(proj_index$usertube, sampleinfo$usertube)]
+  proj_index <- read_tsv("/data/780346_2025-06-11_00-00-00/MAPseq/M305_20251030_USEthis/M305sampleinfo.tsv")
+  head(proj_index)
+  sampleinfo <- read_excel("./M305_sample_information.xlsx", sheet = "Sample information", skip = 1,range = "A2:J122")
+  head(sampleinfo)
+  colnames(sampleinfo) <- c("usertube", "ourtube", "samplename", "siteinfo", "QC_qPCR", "rtprimer", "brain", "hemisphere", "ROI", "notes")
+
+  # Need to create a vector to index samples based on slide they came from to circumvent erroneous indexing due lost samples
+  # Keep only the 117 "target" samples
+  design_df <- sampleinfo %>%
+    filter(siteinfo == "target")
+  nrow(design_df)
+  slide_counts <- c(2, 2, 6, 6, 14, 14, 14, 14, 16, 12, 6, 6, 2, 3)
+  stopifnot(sum(slide_counts) == nrow(design_df))
+  slide_vector <- rep(seq_along(slide_counts), times = slide_counts)
+  length(slide_vector)  # 117
+  design_df$slide <- slide_vector
+  proj_index <- proj_index %>%
+    left_join(
+      design_df %>% select(rtprimer, ROI, hemisphere, slide),
+      by = "rtprimer"
+    )
   
-  # Rename BC columns to region_samplename_unique
+  # Format the data by putting it together
+  # Get the BC columns and match them to brain region names and samplename
   bc_cols <- grep("^BC\\d+$", colnames(projection_matrix), value = TRUE)
   rtprimer_numbers <- as.integer(sub("BC", "", bc_cols))
-  region_names <- proj_index$region[match(rtprimer_numbers, proj_index$MapSeqV1_tube)]
-  samplenames  <- proj_index$samplename[match(rtprimer_numbers, proj_index$MapSeqV1_tube)]
-  region_samplename <- paste(region_names, samplenames, sep = "_")
-  region_samplename_unique <- make.unique(region_samplename)
-  colnames(projection_matrix)[match(bc_cols, colnames(projection_matrix))] <- region_samplename_unique
+  # For each BC column, find the corresponding region and samplename
+  hemi   <- proj_index$hemisphere[match(rtprimer_numbers, proj_index$rtprimer)]
+  roi    <- proj_index$ROI[match(rtprimer_numbers, proj_index$rtprimer)]
+  slide  <- proj_index$slide[match(rtprimer_numbers, proj_index$rtprimer)]
+  # Combine region and samplename for new column names
+  region_samplename <- paste0(roi, "_", hemi, ".", slide)
+  # Rename BC columns to region_samplename
+  colnames(projection_matrix)[match(bc_cols, colnames(projection_matrix))] <- region_samplename
+  head(projection_matrix)
   
   # Merge cell metadata
   cell_metadata_subset <- cell_metadata %>%
@@ -146,142 +168,6 @@ load_data <-function() {
   }
   rownames(proj_matrix_rownorm) <- rnames
   colnames(proj_matrix_rownorm) <- cnames
-  
-  # Check for olf bulb mislabeling and fix if needed
-  RH_soma_mask <- inRH_lookup_filtered$inRH == 1
-  LH_soma_mask <- inRH_lookup_filtered$inRH == 0
-  
-  # Find all olfactory bulb columns (including numbered variants)
-  olf_bulb_cols <- grep("^olf bulb", colnames(proj_matrix_raw), value = TRUE)
-  olf_bulb_RH_cols <- grep("^olf bulb.*_RH", olf_bulb_cols, value = TRUE)
-  olf_bulb_LH_cols <- grep("^olf bulb.*_LH", olf_bulb_cols, value = TRUE)
-  
-  if(length(olf_bulb_RH_cols) > 0 && length(olf_bulb_LH_cols) > 0) {
-    cat("\n=== Olfactory Bulb Analysis ===\n")
-    cat("Found olfactory bulb columns:\n")
-    cat("RH columns:", paste(olf_bulb_RH_cols, collapse = ", "), "\n")
-    cat("LH columns:", paste(olf_bulb_LH_cols, collapse = ", "), "\n")
-    
-    # Get cells projecting to each olfactory bulb region
-    olf_projecting_cells <- list()
-    
-    cat("\n--- Cells projecting to each olfactory bulb region ---\n")
-    for(col in c(olf_bulb_RH_cols, olf_bulb_LH_cols)) {
-      cells <- which(proj_matrix_raw[, col] > 0)
-      olf_projecting_cells[[col]] <- cells
-      cat(col, ": ", length(cells), " cells\n", sep="")
-    }
-    
-    # Calculate overlaps between all pairs of olfactory bulb regions
-    cat("\n--- Overlap Analysis Between Olfactory Bulb Projecting Cells ---\n")
-    olf_cols <- c(olf_bulb_RH_cols, olf_bulb_LH_cols)
-    
-    for(i in 1:(length(olf_cols)-1)) {
-      for(j in (i+1):length(olf_cols)) {
-        col1 <- olf_cols[i]
-        col2 <- olf_cols[j]
-        
-        cells1 <- olf_projecting_cells[[col1]]
-        cells2 <- olf_projecting_cells[[col2]]
-        
-        overlap <- intersect(cells1, cells2)
-        unique_to_1 <- setdiff(cells1, cells2)
-        unique_to_2 <- setdiff(cells2, cells1)
-        
-        cat("\n", col1, " vs ", col2, ":\n", sep="")
-        cat("  ", col1, " only: ", length(unique_to_1), " cells\n", sep="")
-        cat("  ", col2, " only: ", length(unique_to_2), " cells\n", sep="")
-        cat("  Shared cells: ", length(overlap), " cells\n", sep="")
-        
-        if(length(cells1) > 0) {
-          pct_shared_of_1 <- length(overlap) / length(cells1) * 100
-          cat("  Shared as % of ", col1, " projectors: ", round(pct_shared_of_1, 1), "%\n", sep="")
-        }
-        
-        if(length(cells2) > 0) {
-          pct_shared_of_2 <- length(overlap) / length(cells2) * 100
-          cat("  Shared as % of ", col2, " projectors: ", round(pct_shared_of_2, 1), "%\n", sep="")
-        }
-        
-        # Calculate Jaccard index (overlap / union)
-        union_size <- length(union(cells1, cells2))
-        if(union_size > 0) {
-          jaccard <- length(overlap) / union_size * 100
-          cat("  Jaccard similarity: ", round(jaccard, 1), "%\n", sep="")
-        }
-      }
-    }
-    
-    # Special focus on potential swapping pairs (same base region)
-    cat("\n--- Sample Swap Detection (Corresponding Regions) ---\n")
-    rh_bases <- gsub("_RH.*", "", olf_bulb_RH_cols)
-    lh_bases <- gsub("_LH.*", "", olf_bulb_LH_cols)
-    
-    for(i in seq_along(olf_bulb_RH_cols)) {
-      rh_col <- olf_bulb_RH_cols[i]
-      rh_base <- rh_bases[i]
-      
-      matching_lh <- olf_bulb_LH_cols[lh_bases == rh_base]
-      
-      if(length(matching_lh) > 0) {
-        for(lh_col in matching_lh) {
-          rh_cells <- olf_projecting_cells[[rh_col]]
-          lh_cells <- olf_projecting_cells[[lh_col]]
-          shared_cells <- intersect(rh_cells, lh_cells)
-          
-          cat("\n", rh_col, " vs ", lh_col, " (corresponding regions):\n", sep="")
-          cat("  Total unique cells: ", length(union(rh_cells, lh_cells)), "\n", sep="")
-          cat("  ", rh_col, " projectors: ", length(rh_cells), "\n", sep="")
-          cat("  ", lh_col, " projectors: ", length(lh_cells), "\n", sep="")
-          cat("  Shared projectors: ", length(shared_cells), "\n", sep="")
-          
-          if(length(rh_cells) > 0 && length(lh_cells) > 0) {
-            pct_shared_rh <- length(shared_cells) / length(rh_cells) * 100
-            pct_shared_lh <- length(shared_cells) / length(lh_cells) * 100
-            cat("  % of ", rh_col, " cells that also project to ", lh_col, ": ", round(pct_shared_rh, 1), "%\n", sep="")
-            cat("  % of ", lh_col, " cells that also project to ", rh_col, ": ", round(pct_shared_lh, 1), "%\n", sep="")
-            
-            # High overlap suggests potential sample swap
-            if(pct_shared_rh > 50 || pct_shared_lh > 50) {
-              cat("  *** HIGH OVERLAP - POTENTIAL SAMPLE SWAP? ***\n")
-            }
-          }
-        }
-      }
-    }
-    
-    # Original mislabeling check using first found columns
-    if("olf bulb_RH" %in% colnames(proj_matrix_raw) && "olf bulb_LH" %in% colnames(proj_matrix_raw)) {
-      mean_RH_soma_RH <- mean(proj_matrix_raw[RH_soma_mask, "olf bulb_RH"], na.rm = TRUE)
-      mean_RH_soma_LH <- mean(proj_matrix_raw[RH_soma_mask, "olf bulb_LH"], na.rm = TRUE)
-      mean_LH_soma_RH <- mean(proj_matrix_raw[LH_soma_mask, "olf bulb_RH"], na.rm = TRUE)
-      mean_LH_soma_LH <- mean(proj_matrix_raw[LH_soma_mask, "olf bulb_LH"], na.rm = TRUE)
-      
-      cat("\n=== Mean Projection Analysis ===\n")
-      cat("RH soma: mean olf bulb_RH =", round(mean_RH_soma_RH, 3), "; mean olf bulb_LH =", round(mean_RH_soma_LH, 3), "\n")
-      cat("LH soma: mean olf bulb_RH =", round(mean_LH_soma_RH, 3), "; mean olf bulb_LH =", round(mean_LH_soma_LH, 3), "\n")
-      
-      # If means indicate a switch, swap the columns in all matrices
-      if (mean_RH_soma_RH < mean_RH_soma_LH && mean_LH_soma_RH > mean_LH_soma_LH) {
-        # Swap in raw matrix
-        tmp <- proj_matrix_raw[, "olf bulb_RH"]
-        proj_matrix_raw[, "olf bulb_RH"] <- proj_matrix_raw[, "olf bulb_LH"]
-        proj_matrix_raw[, "olf bulb_LH"] <- tmp
-        
-        # Swap in log matrix
-        tmp <- proj_matrix_log[, "olf bulb_RH"]
-        proj_matrix_log[, "olf bulb_RH"] <- proj_matrix_log[, "olf bulb_LH"]
-        proj_matrix_log[, "olf bulb_LH"] <- tmp
-        
-        # Swap in row-normalized matrix
-        tmp <- proj_matrix_rownorm[, "olf bulb_RH"]
-        proj_matrix_rownorm[, "olf bulb_RH"] <- proj_matrix_rownorm[, "olf bulb_LH"]
-        proj_matrix_rownorm[, "olf bulb_LH"] <- tmp
-        
-        cat("Swapped olf bulb_RH and olf bulb_LH columns due to detected switch.\n")
-      }
-    }  # Close the if("olf bulb_RH" %in% colnames...) block
-  }    # Close the if(length(olf_bulb_RH_cols) > 0...) block
   
   return(list(
     proj_matrix_raw = proj_matrix_raw,
