@@ -269,6 +269,144 @@ result_rank4 <- perform_nmf(t_combined_norm_clean, rank = 4, nrun = 20, seed = 1
 result_rank5 <- perform_nmf(t_combined_norm_clean, rank = 5, nrun = 20, seed = 12345)
 result_rank6 <- perform_nmf(t_combined_norm_clean, rank = 6, nrun = 20, seed = 12345)
 result_rank7 <- perform_nmf(t_combined_norm_clean, rank = 7, nrun = 20, seed = 12345)
+result_rank8 <- perform_nmf(t_combined_norm_clean, rank = 8, nrun = 20, seed = 12345)
+result_rank9 <- perform_nmf(t_combined_norm_clean, rank = 9, nrun = 20, seed = 12345)
+result_rank10 <- perform_nmf(t_combined_norm_clean, rank = 10, nrun = 20, seed = 12345)
+
+##########################################################################################################################################
+# Diagnose which rank best suited to describing these data
+nmf_results <- list(
+  r2 = result_rank2,
+  r3 = result_rank3,
+  r4 = result_rank4,
+  r5 = result_rank5,
+  r6 = result_rank6,
+  r7 = result_rank7,
+  r8 = result_rank8,
+  r9 = result_rank9,
+  r10 = result_rank10
+)
+
+ranks <- 2:10
+
+rank_metrics <- lapply(seq_along(nmf_results), function(i) {
+  res <- nmf_results[[i]]$nmf_result
+  rank <- ranks[i]
+  
+  # Cophenetic correlation
+  coph <- cophcor(res)
+  
+  # Consensus matrix
+  cons <- consensus(res)
+  
+  # Distance on consensus
+  dist_cons <- as.dist(1 - cons)
+  
+  # Cluster assignments (FIXED)
+  cl_raw <- predict(res)
+  cl <- as.integer(as.character(cl_raw))
+  names(cl) <- names(cl_raw)
+  cl <- cl[rownames(cons)]
+  
+  # Silhouette
+  sil <- silhouette(cl, dist_cons)
+  mean_sil <- mean(sil[, "sil_width"])
+  
+  # Reconstruction error
+  rss <- residuals(res)
+  
+  data.frame(
+    rank = rank,
+    cophenetic = coph,
+    silhouette = mean_sil,
+    rss = rss
+  )
+})
+
+
+metrics_df <- do.call(rbind, rank_metrics)
+metrics_df
+
+nmf_theme <- theme_classic() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 11),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 9)
+  )
+# Cophenetic correlation (stability across runs) - how reproducible the clustering implied by NMF is across nrun
+p_coph <- ggplot(metrics_df, aes(x = rank, y = cophenetic)) +
+  geom_point(size = 2.5) +
+  geom_line() +
+  scale_y_continuous(limits = c(0, 1)) +
+  scale_x_continuous(breaks = metrics_df$rank) +
+  xlab("NMF rank") +
+  ylab("Cophenetic\ncorrelation") +
+  ggtitle("Stability across runs") +
+  nmf_theme
+# Silhouette score - how well each sample fits its assigned cluster
+p_sil <- ggplot(metrics_df, aes(x = rank, y = silhouette)) +
+  geom_point(size = 2.5) +
+  geom_line() +
+  scale_y_continuous(limits = c(0, 1)) +
+  scale_x_continuous(breaks = metrics_df$rank) +
+  xlab("NMF rank") +
+  ylab("Mean silhouette width\n(consensus)") +
+  ggtitle("Cluster separability") +
+  nmf_theme
+# Reconstruction error (RSS / explained variance)
+p_rss <- ggplot(metrics_df, aes(x = rank, y = rss)) +
+  geom_point(size = 2.5) +
+  geom_line() +
+  scale_x_continuous(breaks = metrics_df$rank) +
+  xlab("NMF rank") +
+  ylab("Reconstruction error (RSS)") +
+  ggtitle("Model fit") +
+  nmf_theme
+p_combined <- p_coph | p_sil | p_rss
+p_combined
+ggsave(
+  filename = "NMF_rank_diagnostics_cophenetic_silhouette_RSS.pdf",
+  plot = p_combined,
+  width = 9,
+  height = 5,
+  units = "in"
+)
+
+# Check for overfitting at higher ranks where biological sparsity collapses
+gini <- function(x) {
+  x <- sort(x)
+  n <- length(x)
+  1 - (2 * sum((n:1) * x) / (n * sum(x))) + (1 / n)
+}
+
+factor_sparsity_gini <- sapply(nmf_results, function(res) {
+  H <- res$H
+  mean(apply(H, 1, gini))
+})
+
+sparsity_df <- data.frame(
+  rank = ranks,
+  factor_sparsity = factor_sparsity_gini
+)
+
+p_sparsity <- ggplot(sparsity_df, aes(x = rank, y = factor_sparsity)) +
+  geom_point(size = 2.5) +
+  geom_line() +
+  scale_x_continuous(breaks = ranks) +
+  scale_y_continuous(limits = c(0,1)) +
+  xlab("NMF rank") +
+  ylab("Mean factor sparsity (Gini coefficient)") +
+  ggtitle("Factor sparsity (Gini) vs NMF rank") +
+  nmf_theme
+
+p_sparsity
+ggsave(
+  filename = "NMF_rank_diagnostics_sparsity.pdf",
+  plot = p_sparsity,
+  width = 5,
+  height = 5,
+  units = "in"
+)
 
 ##########################################################################################################################################
 # W: factors x cells (from NMF result)
@@ -295,9 +433,9 @@ cell_factors <- cell_factors %>%
     proj_pattern = ifelse(factor %in% c(4), "Posterior", "Anterior"),
     proj_target  = case_when(
       factor == 4 ~ "medulla-SP",
-      factor == 2 ~ "olf-ant_ctx",
+      factor == 2 ~ "dorsal_ctx",
       factor == 1 ~ "midbrain-hindbrain",
-      factor == 3 ~ "ctx-posterior_hippocampus",
+      factor == 3 ~ "olf_ventral_ctx",
       TRUE        ~ NA_character_
     )
   )
@@ -360,7 +498,13 @@ dev.off()
 
 # check how factor loading relates to transcriptomic identity
 # ensure that only data from properly segmented cells is being utilized here
-good_cells <- read.csv("LC_visualQC_barcoded_cells.csv")
+good_cells_brain3 <- read.csv("/scratch/BARseq_780345/LC_visualQC_barcoded_cells.csv")
+good_cells_brain4 <- read.csv("/scratch/BARseq_780346/LC_visualQC_barcoded_cells.csv")
+# Select only the relevant columns (uid and good_barcoded) from each to ensure compatibility
+good_cells_brain3_clean <- good_cells_brain3[, c("uid", "good_barcoded")]
+good_cells_brain4_clean <- good_cells_brain4[, c("uid", "good_barcoded")]
+# Concatenate (rbind) the cleaned data frames into a new good_cells data frame
+good_cells <- rbind(good_cells_brain3_clean, good_cells_brain4_clean)
 good_uids <- good_cells$uid[good_cells$good_barcoded == 1]
 # Remove suffixes from cell IDs in W
 base_cell_ids <- sub("\\..*$", "", colnames(W))  # remove everything after first dot  sub("\\.[0-9]+$", "", colnames(W))

@@ -587,3 +587,53 @@ normalize_projection_matrix <- function(proj_matrix, matrix_name = "unknown") {
   cat("Final matrix dimensions:", dim(proj_matrix), "\n")
   return(proj_matrix)
 }
+
+# Preserve information across orders of magnitude before relative scaling
+# This version compresses large projections while expanding low-abundance, reproducible projections, before enforcing relative comparisons
+# Function to normalize projection matrix: log transform, row normalize, then global max norm
+# Function to normalize projection matrix:
+# log-scale raw projections -> row normalization -> optional global max scaling
+normalize_projection_matrix_2 <- function(proj_matrix,
+                                          matrix_name = "unknown",
+                                          scale_factor = 100,
+                                          global_max_norm = TRUE) {
+  
+  cat("\n=== Normalizing", matrix_name, "===\n")
+  cat("Original matrix dimensions:", dim(proj_matrix), "\n")
+  cat("Original range:", range(as.matrix(proj_matrix), na.rm = TRUE), "\n")
+  
+  # Preserve rownames
+  row_ids <- rownames(proj_matrix)
+  
+  # Ensure numeric matrix
+  proj_matrix <- as.matrix(proj_matrix)
+  storage.mode(proj_matrix) <- "numeric"
+  
+  # Step 1: Log-transform raw projection strengths
+  # Expands low-abundance projections while compressing large ones
+  proj_matrix <- log10(1 + proj_matrix * scale_factor)
+  proj_matrix[!is.finite(proj_matrix)] <- 0
+  cat("After log transform (pre-normalization) - range:", range(proj_matrix, na.rm = TRUE), "\n")
+  
+  # Step 2: Row normalization (relative projection pattern per cell)
+  row_sums <- rowSums(proj_matrix, na.rm = TRUE)
+  row_sums[row_sums == 0] <- 1  # avoid division by zero
+  proj_matrix <- proj_matrix / row_sums
+  cat("After row normalization - range:", range(proj_matrix, na.rm = TRUE), "\n")
+  
+  # Step 3: Optional global max normalization (visualization / integration)
+  if (global_max_norm) {
+    global_max <- max(proj_matrix, na.rm = TRUE)
+    if (global_max > 0) {
+      proj_matrix <- proj_matrix / global_max
+    }
+    cat("After global max normalization - range:", range(proj_matrix, na.rm = TRUE), "\n")
+  }
+  
+  # Restore rownames
+  rownames(proj_matrix) <- row_ids
+  
+  cat("Final matrix dimensions:", dim(proj_matrix), "\n")
+  return(proj_matrix)
+}
+
