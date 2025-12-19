@@ -1,9 +1,6 @@
 # Load functions which handle pre-processing or organizing of the data
 source("~/capsule/code/01_loaders_brain3-4_combined.R")
 
-#set working directory 
-setwd('/scratch/BARseq_780345-780346_combined/')
-
 brain3 <- load_data_brain3()
 names(brain3)
 # Extract components
@@ -142,6 +139,7 @@ head(combined_norm)
 # # Subset inRH_lookup in the same way
 # inRH_lookup <- inRH_lookup[base_rownames %in% good_uids, , drop = FALSE]
 #############################################################################################################################
+
 # Plot heatmap of log-norm projections
 heatmap.2(combined_norm, 
           distfun = function(x) proxy::dist(x, method = "cosine"), 
@@ -157,8 +155,8 @@ heatmap.2(combined_norm,
           keysize = 1,
           margins = c(10, 8), 
           col = viridis,  
-          main = "Combined Log-norm projections map (Ipsi-Contra)")
-dev.copy(pdf, "heatmap_combined_lognorm_roisort_clust_ipsi-contra.pdf", width = 16, height = 12)
+          main = "Combined norm projections map (Ipsi-Contra)")
+dev.copy(pdf, "heatmap_combined_norm_roisort_clust_ipsi-contra.pdf", width = 14, height = 10)
 dev.off()
 
 #################################################################################################################
@@ -254,7 +252,7 @@ perform_nmf <- function(mat_ordered, rank, nrun, seed = NULL) {
               nmf_result = nmf_result))
 }
 ############################################ ipsi and contralateral NMF ##################################################################
-# Transpose for NMF  as NMF seems to internally assume that columns are samples
+# Transpose for NMF as NMF seems to internally assume that columns are samples
 t_combined_norm <- t(combined_norm)
 t_combined_norm_clean <- t_combined_norm[
   rowSums(t_combined_norm) != 0,
@@ -286,32 +284,27 @@ nmf_results <- list(
   r9 = result_rank9,
   r10 = result_rank10
 )
+saveRDS(nmf_results, file = "nmf_results.rds")
 
 ranks <- 2:10
-
 rank_metrics <- lapply(seq_along(nmf_results), function(i) {
   res <- nmf_results[[i]]$nmf_result
   rank <- ranks[i]
   
   # Cophenetic correlation
   coph <- cophcor(res)
-  
   # Consensus matrix
   cons <- consensus(res)
-  
   # Distance on consensus
   dist_cons <- as.dist(1 - cons)
-  
   # Cluster assignments (FIXED)
   cl_raw <- predict(res)
   cl <- as.integer(as.character(cl_raw))
   names(cl) <- names(cl_raw)
   cl <- cl[rownames(cons)]
-  
   # Silhouette
   sil <- silhouette(cl, dist_cons)
   mean_sil <- mean(sil[, "sil_width"])
-  
   # Reconstruction error
   rss <- residuals(res)
   
@@ -322,7 +315,6 @@ rank_metrics <- lapply(seq_along(nmf_results), function(i) {
     rss = rss
   )
 })
-
 
 metrics_df <- do.call(rbind, rank_metrics)
 metrics_df
@@ -381,7 +373,7 @@ gini <- function(x) {
 
 factor_sparsity_gini <- sapply(nmf_results, function(res) {
   H <- res$H
-  mean(apply(H, 1, gini))
+  mean(apply(H, 2, gini))
 })
 
 sparsity_df <- data.frame(
@@ -409,6 +401,7 @@ ggsave(
 )
 
 ##########################################################################################################################################
+# Record parameters, make sure that cell loading per factor makes sense
 # W: factors x cells (from NMF result)
 W <- result_rank4$W
 n_factors <- nrow(W)
@@ -433,7 +426,7 @@ cell_factors <- cell_factors %>%
     proj_pattern = ifelse(factor %in% c(4), "Posterior", "Anterior"),
     proj_target  = case_when(
       factor == 4 ~ "medulla-SP",
-      factor == 2 ~ "dorsal_ctx",
+      factor == 2 ~ "dorsal_ctx-hippocamp",
       factor == 1 ~ "midbrain-hindbrain",
       factor == 3 ~ "olf_ventral_ctx",
       TRUE        ~ NA_character_
@@ -496,6 +489,11 @@ heatmap.2(W_factor_relmax,
 dev.copy(pdf, "heatmap_W_factor_relmax.pdf", width = 8, height = 8)
 dev.off()
 
+
+
+
+
+##########################################################################################################################################
 # check how factor loading relates to transcriptomic identity
 # ensure that only data from properly segmented cells is being utilized here
 good_cells_brain3 <- read.csv("/scratch/BARseq_780345/LC_visualQC_barcoded_cells.csv")
