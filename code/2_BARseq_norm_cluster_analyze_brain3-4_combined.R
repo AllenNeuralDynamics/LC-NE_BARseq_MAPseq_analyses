@@ -1044,6 +1044,39 @@ head(unique_to_brain4)
 brain3_subset <- brain3[rownames(brain3) %in% rownames(brain4), ]
 # Verify the new dimensions
 dim(brain3_subset)
+
+# # Data export for Shuonan
+# cnt3 <- assay(brain3_subset, "counts")
+# cnt4 <- assay(brain4, "counts")
+# colnames(cnt3) <- make.unique(colnames(cnt3), sep="__dup")
+# colnames(cnt4) <- make.unique(colnames(cnt4), sep="__dup")
+# colnames(cnt3) <- paste0("brain3|", colnames(cnt3))
+# colnames(cnt4) <- paste0("brain4|", colnames(cnt4))
+# preview_genes <- rownames(cnt3)[1:10]
+# preview_cells3 <- colnames(cnt3)[1:5]
+# preview_cells4 <- colnames(cnt4)[1:5]
+# preview3 <- as.data.frame(as.matrix(t(cnt3[preview_genes, preview_cells3])))
+# preview4 <- as.data.frame(as.matrix(t(cnt4[preview_genes, preview_cells4])))
+# preview3
+# preview4
+# dt3 <- as.data.table(as.matrix(t(cnt3)), keep.rownames = "cell_id")
+# library(data.table)
+# dt3 <- as.data.table(as.matrix(t(cnt3)), keep.rownames = "cell_id")
+# dt4 <- as.data.table(as.matrix(t(cnt4)), keep.rownames = "cell_id")
+# fwrite(dt3, "brain3_counts_cells_by_genes.csv.gz")
+# fwrite(dt4, "brain4_counts_cells_by_genes.csv.gz")
+# cd3 <- as.data.table(as.data.frame(colData(brain3)))
+# cd3[, cell_id := colnames(cnt3)]
+# fwrite(cd3, "brain3_colData.csv.gz")
+# cd4 <- as.data.table(as.data.frame(colData(brain4)))
+# cd4[, cell_id := colnames(cnt4)]
+# fwrite(cd4, "brain4_colData.csv.gz")
+# View(dt4)
+# View(dt3)
+# View(cd3)
+# View(cd4)
+
+
 # Concatenate along columns (cells)
 combined_sce <- cbind(brain3_subset, brain4)
 # Verify dimensions
