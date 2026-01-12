@@ -1,143 +1,153 @@
-# Load functions which handle pre-processing or organizing of the data
-source("~/capsule/code/01_loaders_brain3-4_combined.R")
+# # Load functions which handle pre-processing or organizing of the data
+# source("~/capsule/code/01_loaders_brain3-4_combined.R")
+# 
+# brain3 <- load_data_brain3()
+# names(brain3)
+# # Extract components
+# brain3_raw_proj_matrix <- as.data.frame(brain3$proj_matrix_raw)
+# # Preserve original rownames
+# rownames(brain3_raw_proj_matrix) <- rownames(brain3$proj_matrix_raw)
+# brain3_inRH_lookup <- brain3$inRH_lookup
+# brain3_metadata <- brain3$metadata
+# 
+# brain4 <- load_data_brain4()
+# names(brain4)
+# # Extract components
+# brain4_raw_proj_matrix <- as.data.frame(brain4$proj_matrix_raw)
+# # Preserve original rownames
+# rownames(brain4_raw_proj_matrix) <- rownames(brain4$proj_matrix_raw)
+# brain4_inRH_lookup <- brain4$inRH_lookup
+# brain4_metadata <- brain4$metadata
+# 
+# #set working directory to save things to
+# setwd('/scratch/BARseq_780345-780346_combined/')
+# 
+# # Ensure ROI compatibility between brain3 and brain4 ROIs 
+# colnames(brain3_raw_proj_matrix)
+# colnames(brain4_raw_proj_matrix)
+# # Correct Amyg-GPe spelling
+# colnames(brain4_raw_proj_matrix) <- stringr::str_replace_all(colnames(brain4_raw_proj_matrix), "amyg-Gpe", "amyg-GPe")
+# # Sum cerebellum sections into one sample
+# groups <- c("RH.12", "LH.12")
+# for (group in groups) {
+#   i_col <- paste0("cerebellum I_", group)
+#   ii_col <- paste0("cerebellum II_", group)
+#   new_col <- paste0("cerebellum_", group)
+#   if (i_col %in% colnames(brain4_raw_proj_matrix) && ii_col %in% colnames(brain4_raw_proj_matrix)) {
+#     # Sum the projections
+#     brain4_raw_proj_matrix[, new_col] <- brain4_raw_proj_matrix[, i_col] + brain4_raw_proj_matrix[, ii_col]
+#     # Remove the original I and II columns
+#     brain4_raw_proj_matrix <- brain4_raw_proj_matrix[, !(colnames(brain4_raw_proj_matrix) %in% c(i_col, ii_col))]
+#     cat("Summed", i_col, "+", ii_col, "into", new_col, "\n")
+#   } else {
+#     cat("Warning: Columns for", group, "not found\n")
+#   }
+# }
+# 
+# # Sum columns with corresponding base ROI names to enhance dataset compatibility - brain3
+# dim(brain3_raw_proj_matrix)
+# head(brain3_raw_proj_matrix)
+# brain3_result <- sum_by_base_roi(brain3_raw_proj_matrix)
+# brain3_summed <- brain3_result$summed_matrix
+# dim(brain3_summed)
+# head(brain3_summed)
+# brain3_mapping <- brain3_result$mapping
+# cat("Brain3 mapping (what was combined into each base ROI):\n")
+# for (base in names(brain3_mapping)) {
+#   cat(base, ":", paste(brain3_mapping[[base]], collapse = ", "), "\n")
+# }
+# 
+# # Sum columns with corresponding base ROI names to enhance dataset compatibility - brain4
+# dim(brain4_raw_proj_matrix)
+# head(brain4_raw_proj_matrix)
+# brain4_result <- sum_by_base_roi(brain4_raw_proj_matrix)
+# brain4_summed <- brain4_result$summed_matrix
+# dim(brain4_summed)
+# head(brain4_summed)
+# brain4_mapping <- brain4_result$mapping
+# cat("\nBrain4 mapping:\n")
+# for (base in names(brain4_mapping)) {
+#   cat(base, ":", paste(brain4_mapping[[base]], collapse = ", "), "\n")
+# }
+# 
+# # Apply ipsi-contra to brain3 summed matrix
+# ipsi_contra_brain3 <- create_ipsi_contra_from_matrix(brain3_summed, brain3_inRH_lookup, "brain3 summed")
+# head(ipsi_contra_brain3)
+# 
+# # Apply ipsi-contra to brain4 summed matrix
+# ipsi_contra_brain4 <- create_ipsi_contra_from_matrix(brain4_summed, brain4_inRH_lookup, "brain4 summed")
+# head(ipsi_contra_brain4)
+# 
+# # Get column names from the ipsi-contra matrices
+# brain3_cols <- colnames(ipsi_contra_brain3)
+# brain4_cols <- colnames(ipsi_contra_brain4)
+# # Find shared regions (exact matches)
+# shared_regions <- intersect(brain3_cols, brain4_cols)
+# # Find unique regions
+# unique_brain3 <- setdiff(brain3_cols, brain4_cols)
+# unique_brain4 <- setdiff(brain4_cols, brain3_cols)
+# # Print results
+# cat("Shared regions (", length(shared_regions), "):\n")
+# if (length(shared_regions) > 0) {
+#   cat(paste(sort(shared_regions), collapse = ", "), "\n\n")
+# }
+# cat("Unique to brain3 (", length(unique_brain3), "):\n")
+# if (length(unique_brain3) > 0) {
+#   cat(paste(sort(unique_brain3), collapse = ", "), "\n\n")
+# }
+# cat("Unique to brain4 (", length(unique_brain4), "):\n")
+# if (length(unique_brain4) > 0) {
+#   cat(paste(sort(unique_brain4), collapse = ", "), "\n\n")
+# }
+# 
+# # Subset to shared regions
+# brain3_shared <- ipsi_contra_brain3[, shared_regions, drop = FALSE]
+# head(brain3_shared)
+# brain4_shared <- ipsi_contra_brain4[, shared_regions, drop = FALSE]
+# head(brain4_shared)
+# 
+# # Normalize each subset
+# brain3_shared_norm <- normalize_projection_matrix(brain3_shared, "brain3 shared ipsi-contra")
+# head(brain3_shared_norm)
+# brain4_shared_norm <- normalize_projection_matrix(brain4_shared, "brain4 shared ipsi-contra")
+# head(brain4_shared_norm)
+# 
+# # Combine the normalized subsets
+# combined_norm <- as.data.frame(rbind(brain3_shared_norm, brain4_shared_norm))
+# head(combined_norm)
+# cat("Combined normalized matrix dimensions:", dim(combined_norm), "\n")
+# 
+# # Preserve rownames before conversion
+# original_rownames <- rownames(combined_norm)
+# # Convert to numeric matrix
+# combined_norm <- as.matrix(combined_norm)
+# combined_norm <- apply(combined_norm, 2, as.numeric)  # Ensure numeric
+# combined_norm <- as.matrix(combined_norm)
+# # Reassign rownames
+# rownames(combined_norm) <- original_rownames
+# head(combined_norm) 
+# 
+# # Combine metadata from brain3 and brain4
+# combined_metadata <- rbind(brain3_metadata, brain4_metadata)
 
-brain3 <- load_data_brain3()
-names(brain3)
-# Extract components
-brain3_raw_proj_matrix <- as.data.frame(brain3$proj_matrix_raw)
-# Preserve original rownames
-rownames(brain3_raw_proj_matrix) <- rownames(brain3$proj_matrix_raw)
-brain3_inRH_lookup <- brain3$inRH_lookup
-brain3_metadata <- brain3$metadata
+source("~/capsule/code/02_prepare_brain3_4_combined_inputs.R")
 
-brain4 <- load_data_brain4()
-names(brain4)
-# Extract components
-brain4_raw_proj_matrix <- as.data.frame(brain4$proj_matrix_raw)
-# Preserve original rownames
-rownames(brain4_raw_proj_matrix) <- rownames(brain4$proj_matrix_raw)
-brain4_inRH_lookup <- brain4$inRH_lookup
-brain4_metadata <- brain4$metadata
+OUT_DIR <- "/scratch/BARseq_780345-780346_combined/"
 
-#set working directory to save things to
-setwd('/scratch/BARseq_780345-780346_combined/')
+prep <- prepare_brain3_4_inputs(
+  loaders_path = "~/capsule/code/01_loaders_brain3-4_combined.R",
+  out_dir = OUT_DIR,
+  verbose = TRUE,
+  return_intermediates = TRUE,
+  restore_wd = FALSE
+)
 
-# Ensure ROI compatibility between brain3 and brain4 ROIs 
-colnames(brain3_raw_proj_matrix)
-colnames(brain4_raw_proj_matrix)
-# Correct Amyg-GPe spelling
-colnames(brain4_raw_proj_matrix) <- stringr::str_replace_all(colnames(brain4_raw_proj_matrix), "amyg-Gpe", "amyg-GPe")
-# Sum cerebellum sections into one sample
-groups <- c("RH.12", "LH.12")
-for (group in groups) {
-  i_col <- paste0("cerebellum I_", group)
-  ii_col <- paste0("cerebellum II_", group)
-  new_col <- paste0("cerebellum_", group)
-  if (i_col %in% colnames(brain4_raw_proj_matrix) && ii_col %in% colnames(brain4_raw_proj_matrix)) {
-    # Sum the projections
-    brain4_raw_proj_matrix[, new_col] <- brain4_raw_proj_matrix[, i_col] + brain4_raw_proj_matrix[, ii_col]
-    # Remove the original I and II columns
-    brain4_raw_proj_matrix <- brain4_raw_proj_matrix[, !(colnames(brain4_raw_proj_matrix) %in% c(i_col, ii_col))]
-    cat("Summed", i_col, "+", ii_col, "into", new_col, "\n")
-  } else {
-    cat("Warning: Columns for", group, "not found\n")
-  }
-}
+setwd(OUT_DIR)  # explicit, guarantees downstream saves go here
 
-# Sum columns with corresponding base ROI names to enhance dataset compatibility - brain3
-dim(brain3_raw_proj_matrix)
-head(brain3_raw_proj_matrix)
-brain3_result <- sum_by_base_roi(brain3_raw_proj_matrix)
-brain3_summed <- brain3_result$summed_matrix
-dim(brain3_summed)
-head(brain3_summed)
-brain3_mapping <- brain3_result$mapping
-cat("Brain3 mapping (what was combined into each base ROI):\n")
-for (base in names(brain3_mapping)) {
-  cat(base, ":", paste(brain3_mapping[[base]], collapse = ", "), "\n")
-}
+combined_norm <- prep$combined_norm
+combined_metadata <- prep$combined_metadata     
+combined_inRH_lookup <- prep$combined_inRH_lookup
 
-# Sum columns with corresponding base ROI names to enhance dataset compatibility - brain4
-dim(brain4_raw_proj_matrix)
-head(brain4_raw_proj_matrix)
-brain4_result <- sum_by_base_roi(brain4_raw_proj_matrix)
-brain4_summed <- brain4_result$summed_matrix
-dim(brain4_summed)
-head(brain4_summed)
-brain4_mapping <- brain4_result$mapping
-cat("\nBrain4 mapping:\n")
-for (base in names(brain4_mapping)) {
-  cat(base, ":", paste(brain4_mapping[[base]], collapse = ", "), "\n")
-}
-
-# Apply ipsi-contra to brain3 summed matrix
-ipsi_contra_brain3 <- create_ipsi_contra_from_matrix(brain3_summed, brain3_inRH_lookup, "brain3 summed")
-head(ipsi_contra_brain3)
-
-# Apply ipsi-contra to brain4 summed matrix
-ipsi_contra_brain4 <- create_ipsi_contra_from_matrix(brain4_summed, brain4_inRH_lookup, "brain4 summed")
-head(ipsi_contra_brain4)
-
-# Get column names from the ipsi-contra matrices
-brain3_cols <- colnames(ipsi_contra_brain3)
-brain4_cols <- colnames(ipsi_contra_brain4)
-# Find shared regions (exact matches)
-shared_regions <- intersect(brain3_cols, brain4_cols)
-# Find unique regions
-unique_brain3 <- setdiff(brain3_cols, brain4_cols)
-unique_brain4 <- setdiff(brain4_cols, brain3_cols)
-# Print results
-cat("Shared regions (", length(shared_regions), "):\n")
-if (length(shared_regions) > 0) {
-  cat(paste(sort(shared_regions), collapse = ", "), "\n\n")
-}
-cat("Unique to brain3 (", length(unique_brain3), "):\n")
-if (length(unique_brain3) > 0) {
-  cat(paste(sort(unique_brain3), collapse = ", "), "\n\n")
-}
-cat("Unique to brain4 (", length(unique_brain4), "):\n")
-if (length(unique_brain4) > 0) {
-  cat(paste(sort(unique_brain4), collapse = ", "), "\n\n")
-}
-
-# Subset to shared regions
-brain3_shared <- ipsi_contra_brain3[, shared_regions, drop = FALSE]
-head(brain3_shared)
-brain4_shared <- ipsi_contra_brain4[, shared_regions, drop = FALSE]
-head(brain4_shared)
-
-# Normalize each subset
-brain3_shared_norm <- normalize_projection_matrix(brain3_shared, "brain3 shared ipsi-contra")
-head(brain3_shared_norm)
-brain4_shared_norm <- normalize_projection_matrix(brain4_shared, "brain4 shared ipsi-contra")
-head(brain4_shared_norm)
-
-# Combine the normalized subsets
-combined_norm <- as.data.frame(rbind(brain3_shared_norm, brain4_shared_norm))
-head(combined_norm)
-cat("Combined normalized matrix dimensions:", dim(combined_norm), "\n")
-
-# Preserve rownames before conversion
-original_rownames <- rownames(combined_norm)
-# Convert to numeric matrix
-combined_norm <- as.matrix(combined_norm)
-combined_norm <- apply(combined_norm, 2, as.numeric)  # Ensure numeric
-combined_norm <- as.matrix(combined_norm)
-# Reassign rownames
-rownames(combined_norm) <- original_rownames
-head(combined_norm) 
-
-# Combine metadata from brain3 and brain4
-combined_metadata <- rbind(brain3_metadata, brain4_metadata)
-
-# Check if combined_metadata is in the same order as combined_norm based on rownames
-order_match <- all(rownames(combined_norm) == combined_metadata$row_id)
-cat("Are the rownames of combined_norm and row_id in combined_metadata in the same order?", order_match, "\n")
-if (!order_match) {
-  combined_metadata <- combined_metadata[match(rownames(combined_norm), combined_metadata$row_id), ]
-  cat("Reordered combined_metadata to match combined_norm rownames.\n")
-}
-head(combined_metadata)
 # Save combined_metadata to a CSV file in the working directory
 write.csv(combined_metadata, file = "MAPseq_combined_metadata.csv", row.names = FALSE)
 
@@ -241,12 +251,6 @@ grid::grid.newpage()
 grid::grid.draw(p$gtable)
 dev.off()
 
-# PNG output (raster, with DPI)
-png("sorted_proj_heatmap_ipsi-contra.png", width = 3000, height = 1800, res = 300)
-grid::grid.newpage()
-grid::grid.draw(p$gtable)
-dev.off()
-
 corr_matrix <- cor(normalized_mat_sorted, method = "spearman", use = "pairwise.complete.obs")
 head(corr_matrix)
 
@@ -305,13 +309,6 @@ grid::grid.draw(p$gtable)
 grid.text("Rank correlation", x = 0.992, y = 0.83, rot = 90, gp = gpar(fontsize = 11))
 dev.off()
 
-# PNG output (raster, with DPI)
-png("rank_corr_ipsi-contra.png", width = 2400, height = 2400, res = 300)
-grid::grid.newpage()
-grid::grid.draw(p$gtable)
-grid.text("Rank correlation", x = 0.992, y = 0.83, rot = 90, gp = gpar(fontsize = 11))
-dev.off()
-
 # Create a data frame with cell information and their top projections
 cell_top_projections <- data.frame(
   cell_id = rownames(normalized_df),
@@ -338,4 +335,152 @@ cell_top_projections_with_coords <- merge(
 head(cell_top_projections_with_coords)
 dim(cell_top_projections_with_coords)
 write.csv(cell_top_projections_with_coords, "cell_top_projections_with_coords.csv", row.names = FALSE)
+
+# Statis summaries for reporting in the results section
+################################## Coarse aggregation: metrics for Results/Methods ##################################
+
+# Inputs from your script:
+# combined_df        : cells x 12 groups (summed, before normalization)
+# normalized_df/mat  : cells x 12 groups (row-normalized to fractions)
+# normalized_mat_sorted : cells x 12 groups, sorted by top group
+
+stopifnot(exists("combined_df"), exists("normalized_df"), exists("normalized_mat_sorted"))
+stopifnot(is.matrix(normalized_mat_sorted) || is.data.frame(normalized_mat_sorted))
+
+# Ensure matrix
+grouped_frac <- as.matrix(normalized_mat_sorted)
+mode(grouped_frac) <- "numeric"
+
+# Basic sizes
+N_cells  <- nrow(grouped_frac)
+K_groups <- ncol(grouped_frac)
+stopifnot(K_groups == 12)  # expected given your region_order
+
+# Sanity: rows should sum to ~1 (allowing numerical tolerance)
+rs <- rowSums(grouped_frac, na.rm = TRUE)
+if (any(abs(rs - 1) > 1e-6)) {
+  warning("Some rows do not sum to 1; check normalization. Summary of rowSums:")
+  print(summary(rs))
+}
+
+# -------------------------
+# 1) Top-group distribution
+# -------------------------
+top_group <- colnames(grouped_frac)[max.col(grouped_frac, ties.method = "first")]
+top_group_counts <- sort(table(top_group), decreasing = TRUE)
+top_group_df <- data.frame(
+  group = names(top_group_counts),
+  n_cells = as.integer(top_group_counts),
+  frac_cells = as.numeric(top_group_counts) / length(top_group),
+  row.names = NULL
+)
+print(top_group_df)
+
+# -------------------------
+# 2) Dominance metrics (how concentrated is each cell’s coarse profile?)
+# -------------------------
+top1 <- apply(grouped_frac, 1, max, na.rm = TRUE)
+top2 <- apply(grouped_frac, 1, function(x) sort(x, decreasing = TRUE)[2])
+top1_minus_top2 <- top1 - top2
+
+# Normalized entropy (0=all weight in one group; 1=uniform)
+entropy_norm <- apply(grouped_frac, 1, function(p) {
+  p <- p[p > 0]
+  if (!length(p)) return(NA_real_)
+  (-sum(p * log(p))) / log(K_groups)
+})
+
+dominance_summary <- list(
+  N_cells = N_cells,
+  K_groups = K_groups,
+  top1_summary = summary(top1),
+  top1_IQR = quantile(top1, c(0.25, 0.75), na.rm = TRUE),
+  top1_range = range(top1, na.rm = TRUE),
+  top1_minus_top2_summary = summary(top1_minus_top2),
+  entropy_norm_summary = summary(entropy_norm)
+)
+print(dominance_summary)
+
+# -------------------------------------------
+# 3) Rostral vs caudal balance (edit as needed)
+# -------------------------------------------
+rostral_groups <- c("OLF","Isocortex","HPF","CTXsp","CNU","TH","HY")
+caudal_groups  <- c("MB","CB","P","MY","SP")
+stopifnot(all(rostral_groups %in% colnames(grouped_frac)))
+stopifnot(all(caudal_groups  %in% colnames(grouped_frac)))
+
+rostral_frac <- rowSums(grouped_frac[, rostral_groups, drop = FALSE])
+caudal_frac  <- rowSums(grouped_frac[, caudal_groups,  drop = FALSE])
+
+rostral_summary <- list(
+  rostral_frac_summary = summary(rostral_frac),
+  rostral_frac_IQR = quantile(rostral_frac, c(0.25, 0.75), na.rm = TRUE),
+  rostral_frac_range = range(rostral_frac, na.rm = TRUE),
+  frac_rostral_ge_05 = mean(rostral_frac >= 0.5, na.rm = TRUE),
+  frac_caudal_ge_05  = mean(caudal_frac  >= 0.5, na.rm = TRUE)
+)
+print(rostral_summary)
+
+# ---------------------------------------------------------
+# 4) CORRELATION: choose what you actually want to report
+# ---------------------------------------------------------
+
+# (A) Cell-by-cell similarity across coarse profiles (Ncells x Ncells)  <-- THIS matches your current cor(...) call
+cell_corr <- cor(t(grouped_frac), method = "spearman", use = "pairwise.complete.obs")
+diag(cell_corr) <- NA
+cell_corr_off <- cell_corr[upper.tri(cell_corr)]
+cell_corr_off <- cell_corr_off[is.finite(cell_corr_off)]
+
+cell_corr_summary <- list(
+  n_cells = N_cells,
+  n_pairs = length(cell_corr_off),
+  summary = summary(cell_corr_off),
+  quantiles = quantile(cell_corr_off, c(0.05,0.25,0.5,0.75,0.95), na.rm = TRUE),
+  range = range(cell_corr_off, na.rm = TRUE)
+)
+print(cell_corr_summary)
+
+# (B) Group-by-group co-variation across cells (12 x 12)  <-- THIS is what your earlier text described
+group_corr <- cor(grouped_frac, method = "spearman", use = "pairwise.complete.obs")
+diag(group_corr) <- NA
+group_corr_off <- group_corr[upper.tri(group_corr)]
+group_corr_off <- group_corr_off[is.finite(group_corr_off)]
+
+group_corr_summary <- list(
+  n_groups = K_groups,
+  n_pairs = length(group_corr_off),
+  summary = summary(group_corr_off),
+  quantiles = quantile(group_corr_off, c(0.05,0.25,0.5,0.75,0.95), na.rm = TRUE),
+  range = range(group_corr_off, na.rm = TRUE)
+)
+print(group_corr_summary)
+
+# Top +/- correlated group pairs (for Results text)
+get_top_group_pairs <- function(m, top_n = 5, decreasing = TRUE) {
+  diag(m) <- NA
+  ut <- which(upper.tri(m) & is.finite(m), arr.ind = TRUE)
+  vals <- m[ut]
+  ord <- order(vals, decreasing = decreasing)
+  ut <- ut[ord, , drop = FALSE]
+  vals <- vals[ord]
+  idx <- head(seq_along(vals), top_n)
+  data.frame(
+    group_i = colnames(m)[ut[idx, 1]],
+    group_j = colnames(m)[ut[idx, 2]],
+    rho = vals[idx],
+    row.names = NULL
+  )
+}
+top_pos_group_pairs <- get_top_group_pairs(group_corr, top_n = 8, decreasing = TRUE)
+top_neg_group_pairs <- get_top_group_pairs(group_corr, top_n = 8, decreasing = FALSE)
+print(top_pos_group_pairs)
+print(top_neg_group_pairs)
+
+# Optional: write key tables out
+write.csv(top_group_df, "coarse_top_group_counts.csv", row.names = FALSE)
+write.csv(data.frame(cell_id = rownames(grouped_frac), top1 = top1, entropy_norm = entropy_norm,
+                     rostral_frac = rostral_frac, caudal_frac = caudal_frac),
+          "coarse_cell_level_metrics.csv", row.names = FALSE)
+write.csv(top_pos_group_pairs, "coarse_group_corr_top_positive_pairs.csv", row.names = FALSE)
+write.csv(top_neg_group_pairs, "coarse_group_corr_top_negative_pairs.csv", row.names = FALSE)
 

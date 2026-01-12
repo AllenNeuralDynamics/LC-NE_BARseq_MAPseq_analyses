@@ -166,33 +166,126 @@ match_in_batches <- function(barseq_df, mapseq_split, mapseq_vbcs, max_dist = 1,
   do.call(rbind, valid_results)
 }
 
+# --- Resolve matches: keep unique best hit; drop ties (including MAPseq 15-mer collisions) ---
+resolve_best_unique <- function(matches, mapseq_df) {
+  # matches: data.frame with columns CellID, vbc_read (15-mer), dist
+  # mapseq_df: original MAPseq table with full vbc_read (>=15 nt)
+  
+  # 1) quantify MAPseq 15-mer collisions (how many MAPseq rows share each 15-mer)
+  mapseq_short_counts <- mapseq_df %>%
+    dplyr::mutate(VBC_short = substr(vbc_read, 1, 15)) %>%
+    dplyr::count(VBC_short, name = "n_mapseq_rows")
+  
+  # 2) annotate each match with MAPseq multiplicity for that 15-mer
+  m2 <- matches %>%
+    dplyr::left_join(
+      mapseq_short_counts,
+      by = c("vbc_read" = "VBC_short")
+    ) %>%
+    dplyr::mutate(
+      n_mapseq_rows = dplyr::coalesce(n_mapseq_rows, 0L)
+    )
+  
+  if (nrow(m2) == 0) {
+    return(list(
+      selected = m2,
+      dropped_ties = m2,
+      summary = tibble::tibble(
+        n_input_rows = 0L,
+        n_cells_with_any_match = 0L,
+        n_cells_selected = 0L,
+        n_cells_dropped_ties = 0L
+      )
+    ))
+  }
+  
+  # 3) for each CellID, keep only the minimum distance rows
+  m_best <- m2 %>%
+    dplyr::group_by(CellID) %>%
+    dplyr::filter(dist == min(dist, na.rm = TRUE)) %>%
+    dplyr::ungroup()
+  
+  # 4) define "unique winner":
+  #    - exactly 1 best row for the cell
+  #    - AND that 15-mer is unique in MAPseq (n_mapseq_rows == 1)
+  per_cell <- m_best %>%
+    dplyr::group_by(CellID) %>%
+    dplyr::summarise(
+      n_best_rows = dplyr::n(),
+      n_mapseq_rows_winner = dplyr::first(n_mapseq_rows),
+      dist_winner = dplyr::first(dist),
+      .groups = "drop"
+    )
+  
+  selected_cells <- per_cell %>%
+    dplyr::filter(n_best_rows == 1, n_mapseq_rows_winner == 1) %>%
+    dplyr::pull(CellID)
+  
+  selected <- m_best %>%
+    dplyr::filter(CellID %in% selected_cells) %>%
+    dplyr::select(CellID, vbc_read, dist)
+  
+  dropped_ties <- m_best %>%
+    dplyr::filter(!CellID %in% selected_cells) %>%
+    dplyr::arrange(CellID, dist, vbc_read)
+  
+  summary <- tibble::tibble(
+    n_input_rows = nrow(matches),
+    n_cells_with_any_match = dplyr::n_distinct(matches$CellID),
+    n_cells_selected = dplyr::n_distinct(selected$CellID),
+    n_cells_dropped_ties = dplyr::n_distinct(dropped_ties$CellID)
+  )
+  
+  list(selected = selected, dropped_ties = dropped_ties, summary = summary)
+}
+
 # Run matching
 matches_0 <- match_in_batches(barseq, mapseq_split, mapseq_vbcs, max_dist = 0)
 matches_1 <- match_in_batches(barseq, mapseq_split, mapseq_vbcs, max_dist = 1)
 matches_2 <- match_in_batches(barseq, mapseq_split, mapseq_vbcs, max_dist = 2)
 matches_3 <- match_in_batches(barseq, mapseq_split, mapseq_vbcs, max_dist = 3)
 
-summary_table <- data.frame(
+# Resolve (keep unique best hit; drop ties/collisions)
+res_0 <- resolve_best_unique(matches_0, mapseq)
+res_1 <- resolve_best_unique(matches_1, mapseq)
+res_2 <- resolve_best_unique(matches_2, mapseq)
+res_3 <- resolve_best_unique(matches_3, mapseq)
+
+print(res_0$summary)
+print(res_1$summary)
+print(res_2$summary)
+print(res_3$summary)
+
+# Optional: save dropped ties for auditing
+readr::write_csv(res_0$dropped_ties, "matches_0_dropped_ties.csv")
+readr::write_csv(res_1$dropped_ties, "matches_1_dropped_ties.csv")
+readr::write_csv(res_2$dropped_ties, "matches_2_dropped_ties.csv")
+readr::write_csv(res_3$dropped_ties, "matches_3_dropped_ties.csv")
+
+summary_table_resolved <- tibble::tibble(
   Mismatches = 0:3,
-  Total_Matches = c(
-    length(matches_0$CellID),
-    length(matches_1$CellID),
-    length(matches_2$CellID),
-    length(matches_3$CellID)
+  Cells_with_any_match = c(
+    dplyr::n_distinct(matches_0$CellID),
+    dplyr::n_distinct(matches_1$CellID),
+    dplyr::n_distinct(matches_2$CellID),
+    dplyr::n_distinct(matches_3$CellID)
   ),
-  Unique_CellIDs = c(
-    length(unique(matches_0$CellID)),
-    length(unique(matches_1$CellID)),
-    length(unique(matches_2$CellID)),
-    length(unique(matches_3$CellID))
+  Cells_selected_unique_best = c(
+    dplyr::n_distinct(res_0$selected$CellID),
+    dplyr::n_distinct(res_1$selected$CellID),
+    dplyr::n_distinct(res_2$selected$CellID),
+    dplyr::n_distinct(res_3$selected$CellID)
+  ),
+  Cells_dropped_as_ties = c(
+    dplyr::n_distinct(res_0$dropped_ties$CellID),
+    dplyr::n_distinct(res_1$dropped_ties$CellID),
+    dplyr::n_distinct(res_2$dropped_ties$CellID),
+    dplyr::n_distinct(res_3$dropped_ties$CellID)
   )
 )
 
-summary_table$Duplicate_Matches <- summary_table$Total_Matches - summary_table$Unique_CellIDs
-
-print(summary_table)
-
-write.csv(summary_table, file = "summary_table_matches_unique.csv", row.names = FALSE)
+print(summary_table_resolved)
+readr::write_csv(summary_table_resolved, "summary_table_resolved_unique_best.csv")
 
 ############################################################################################################################################################################################################
 # Subset projection data
@@ -243,23 +336,23 @@ check_duplicates <- function(proj) {
   ))
 }
 
-proj_0 <- subset_mapseq_by_matches(matches_0, mapseq)
+proj_0 <- subset_mapseq_by_matches(res_0$selected, mapseq)
 proj_0_nodup <- distinct(proj_0)
 write_csv(proj_0_nodup, "MapSeq_matched_projections_exact.csv")
 result_0 <- check_duplicates(proj_0_nodup)
 
 
-proj_1 <- subset_mapseq_by_matches(matches_1, mapseq)
+proj_1 <- subset_mapseq_by_matches(res_1$selected, mapseq)
 proj_1_nodup <- distinct(proj_1)
 write_csv(proj_1_nodup, "MapSeq_matched_projections_1_mismatch.csv")
 result_1 <- check_duplicates(proj_1_nodup)
 
-proj_2 <- subset_mapseq_by_matches(matches_2, mapseq)
+proj_2 <- subset_mapseq_by_matches(res_2$selected, mapseq)
 proj_2_nodup <- distinct(proj_2)
 write_csv(proj_2_nodup, "MapSeq_matched_projections_2_mismatch.csv")
 result_2 <- check_duplicates(proj_2_nodup)
 
-proj_3 <- subset_mapseq_by_matches(matches_3, mapseq)
+proj_3 <- subset_mapseq_by_matches(res_3$selected, mapseq)
 proj_3_nodup <- distinct(proj_3)
 write_csv(proj_3_nodup, "MapSeq_matched_projections_3_mismatch.csv")
 result_3 <- check_duplicates(proj_3_nodup)
@@ -310,9 +403,12 @@ print_and_save_duplicates(result_2, proj_2_nodup, "proj_2_duplicated_rows.csv")
 # write_csv(proj_1_GENES, "MapSeq_matched_projections_1_mismatch_GENES.csv")
 # write_csv(proj_2_GENES, "MapSeq_matched_projections_2_mismatch_GENES.csv")
 
-# still need to implement this section by checking selected cells and their segmentation - check with Mara
+
 #####################################################################################################################################################################################
-# FPR calculation to select optiomal Hamming distance for matching
+# FPR calculation to select optimal Hamming distance for matching (UPDATED for resolve_best_unique)
+# Estimates probability that a random (or shuffled) BARseq barcode would be *selected* as a unique best MAPseq match
+# under the same resolver you now use (min dist; drop ties; drop MAPseq 15-mer collisions).
+
 # ---------------- SETTINGS ----------------
 barcode_length <- 15
 n_simulations <- 20  # Number of random simulations
@@ -324,9 +420,9 @@ generate_random_barcodes <- function(n, length = 15) {
   replicate(n, paste0(sample(c("A", "C", "G", "T"), length, replace = TRUE), collapse = ""))
 }
 
-# Step 2: Run Matching Simulation
-run_random_matching_simulation <- function(n_simulations, n_barseq, mapseq_split, mapseq_vbcs, max_mismatches) {
-  random_results <- list()
+# Step 2: Run Random Matching Simulation (apply resolver!)
+run_random_matching_simulation <- function(n_simulations, n_barseq, mapseq_split, mapseq_vbcs, mapseq_df, max_mismatches) {
+  random_results <- vector("list", n_simulations)
   
   for (sim in seq_len(n_simulations)) {
     cat("Running simulation", sim, "of", n_simulations, "\n")
@@ -341,128 +437,119 @@ run_random_matching_simulation <- function(n_simulations, n_barseq, mapseq_split
     matches_2 <- match_in_batches(random_df, mapseq_split, mapseq_vbcs, max_dist = 2)
     matches_3 <- match_in_batches(random_df, mapseq_split, mapseq_vbcs, max_dist = 3)
     
-    # Store results
+    # Resolve (keep unique best hit; drop ties/collisions) — SAME RULE AS REAL PIPELINE
+    res_0 <- resolve_best_unique(matches_0, mapseq_df)
+    res_1 <- resolve_best_unique(matches_1, mapseq_df)
+    res_2 <- resolve_best_unique(matches_2, mapseq_df)
+    res_3 <- resolve_best_unique(matches_3, mapseq_df)
+    
+    # Store results as "accepted/selected cells" (and ties for auditing)
     random_results[[sim]] <- list(
-      matches_0 = nrow(matches_0),
-      matches_1 = nrow(matches_1),
-      matches_2 = nrow(matches_2),
-      matches_3 = nrow(matches_3)
+      selected_0 = dplyr::n_distinct(res_0$selected$CellID),
+      selected_1 = dplyr::n_distinct(res_1$selected$CellID),
+      selected_2 = dplyr::n_distinct(res_2$selected$CellID),
+      selected_3 = dplyr::n_distinct(res_3$selected$CellID),
+      ties_0 = dplyr::n_distinct(res_0$dropped_ties$CellID),
+      ties_1 = dplyr::n_distinct(res_1$dropped_ties$CellID),
+      ties_2 = dplyr::n_distinct(res_2$dropped_ties$CellID),
+      ties_3 = dplyr::n_distinct(res_3$dropped_ties$CellID)
     )
   }
   
   return(random_results)
 }
 
-# Step 3: Summarize Random Match Counts
-summarize_random_results <- function(random_results, n_simulations) {
-  random_match_counts <- sapply(random_results, function(res) unlist(res))
-  random_means <- colMeans(random_match_counts)
-  random_means <- setNames(random_means, paste0("Mismatch_", 0:max_mismatches))
-  
-  return(random_means)
-}
-
-# Step 4: Calculate Error Rates
-calculate_error_rates <- function(random_means, n_barseq) {
-  error_rates <- random_means / n_barseq
-  names(error_rates) <- paste0("Mismatch_", 0:max_mismatches)
-  return(error_rates)
-}
-
-# Step 5: Compare to Real Data
-compare_to_real_data <- function(real_match_counts, error_rates) {
-  comparison_df <- data.frame(
-    Mismatches = 0:max_mismatches,
-    Real_Matches = real_match_counts,
-    Random_Mean_Matches = round(error_rates * nrow(barseq)),
-    Error_Rate = round(error_rates, 4)
+# Step 3: Summarize Random Selected/Tie Counts
+summarize_random_results <- function(sim_results) {
+  selected_means <- c(
+    mean(sapply(sim_results, function(x) x$selected_0)),
+    mean(sapply(sim_results, function(x) x$selected_1)),
+    mean(sapply(sim_results, function(x) x$selected_2)),
+    mean(sapply(sim_results, function(x) x$selected_3))
   )
-  
-  return(comparison_df)
+  ties_means <- c(
+    mean(sapply(sim_results, function(x) x$ties_0)),
+    mean(sapply(sim_results, function(x) x$ties_1)),
+    mean(sapply(sim_results, function(x) x$ties_2)),
+    mean(sapply(sim_results, function(x) x$ties_3))
+  )
+  list(selected_means = selected_means, ties_means = ties_means)
 }
 
-# ---------------- RUN ----------------
+# Step 4: Calculate Error Rates (FPR) for selected matches
+calculate_error_rates <- function(mean_selected, n_barseq) {
+  mean_selected / n_barseq
+}
+
+# ---------------- RUN (RANDOM) ----------------
 
 # Real BarSeq Data
 n_barseq <- nrow(barseq)
-real_match_counts <- c(
-  nrow(matches_0),
-  nrow(matches_1),
-  nrow(matches_2),
-  nrow(matches_3)
+
+# IMPORTANT: Real counts should reflect what you now *accept* (res_*), not raw matches_*
+real_selected_counts <- c(
+  dplyr::n_distinct(res_0$selected$CellID),
+  dplyr::n_distinct(res_1$selected$CellID),
+  dplyr::n_distinct(res_2$selected$CellID),
+  dplyr::n_distinct(res_3$selected$CellID)
 )
 
-# Random Simulations
-if (file.exists("random_simulation_results.rds")) {
-  random_results <- readRDS("random_simulation_results.rds")
+real_ties_counts <- c(
+  dplyr::n_distinct(res_0$dropped_ties$CellID),
+  dplyr::n_distinct(res_1$dropped_ties$CellID),
+  dplyr::n_distinct(res_2$dropped_ties$CellID),
+  dplyr::n_distinct(res_3$dropped_ties$CellID)
+)
+
+# Random Simulations (use a NEW filename; old file was pre-resolver format)
+random_sim_file <- "random_simulation_results_resolved.rds"
+if (file.exists(random_sim_file)) {
+  random_results <- readRDS(random_sim_file)
 } else {
-  random_results <- run_random_matching_simulation(n_simulations, n_barseq, mapseq_split, mapseq_vbcs, max_mismatches)
-  saveRDS(random_results, file = "random_simulation_results.rds")
+  random_results <- run_random_matching_simulation(
+    n_simulations, n_barseq, mapseq_split, mapseq_vbcs, mapseq, max_mismatches
+  )
+  saveRDS(random_results, file = random_sim_file)
 }
 
 # Summarize Random Results
-summarize_random_results <- function(random_results, n_simulations) {
-  # Extract match counts for each mismatch level across all simulations
-  mismatch_0_counts <- sapply(random_results, function(res) res$matches_0)
-  mismatch_1_counts <- sapply(random_results, function(res) res$matches_1)
-  mismatch_2_counts <- sapply(random_results, function(res) res$matches_2)
-  mismatch_3_counts <- sapply(random_results, function(res) res$matches_3)
-  
-  # Calculate means for each mismatch level
-  random_means <- c(
-    mean(mismatch_0_counts),
-    mean(mismatch_1_counts),
-    mean(mismatch_2_counts),
-    mean(mismatch_3_counts)
-  )
-  
-  return(random_means)
-}
-random_means <- summarize_random_results(random_results, n_simulations)
+random_summary <- summarize_random_results(random_results)
+random_mean_selected <- random_summary$selected_means
+random_mean_ties <- random_summary$ties_means
 
-# Calculate Error Rates
-calculate_error_rates <- function(random_means, n_barseq) {
-  error_rates <- random_means / n_barseq
-  return(error_rates)
-}
-error_rates <- calculate_error_rates(random_means, n_barseq)
+# Calculate Error Rates (FPR for being selected)
+error_rates_selected <- calculate_error_rates(random_mean_selected, n_barseq)
 
-# Real match counts for 0, 1, and 2 mismatches
-real_match_counts <- c(
-  nrow(matches_0),
-  nrow(matches_1),
-  nrow(matches_2),
-  nrow(matches_3)
-)
-
-# Construct comparison_df
+# Construct comparison_df (RANDOM)
 comparison_df <- data.frame(
-  Mismatches = 0:max_mismatches,  # Mismatch levels (0, 1, 2,3)
-  Real_Matches = real_match_counts,  # Real match counts
-  Random_Mean_Matches = round(random_means),  # Random mean matches
-  Error_Rate = round(error_rates, 4)  # Error rates
+  Mismatches = 0:max_mismatches,
+  Real_Selected = real_selected_counts,
+  Real_Dropped_Ties = real_ties_counts,
+  Random_Mean_Selected = round(random_mean_selected),
+  Random_Mean_Dropped_Ties = round(random_mean_ties),
+  FPR_Selected = round(error_rates_selected, 4)
 )
-comparison_df$Avg_Random_Matches_Per_BarSeq <- round(random_means / n_barseq, 3)
-# Print the comparison_df
-print(comparison_df)
-# Save comparison_df to a CSV file
-write.csv(comparison_df, file = "comparison_df_FPR_error.csv", row.names = FALSE)
+comparison_df$Avg_Random_Selected_Per_BarSeq <- round(random_mean_selected / n_barseq, 4)
 
-# Visualize Results
-p <- ggplot(comparison_df, aes(x = Mismatches, y = Avg_Random_Matches_Per_BarSeq)) +
+# Print and save
+print(comparison_df)
+write.csv(comparison_df, file = "comparison_df_FPR_error_resolved.csv", row.names = FALSE)
+
+# Visualize Results (RANDOM)
+p <- ggplot(comparison_df, aes(x = Mismatches, y = Avg_Random_Selected_Per_BarSeq)) +
   geom_line(color = "blue", linewidth = 1) +
   geom_point(color = "blue", size = 2) +
   labs(
-    title = "Random Match Rate per BarSeq Match",
+    title = "Random *Selected* Match Rate per BarSeq Cell (post-resolver)",
     x = "Allowed Mismatches",
-    y = "Avg Random Matches per BarSeq"
+    y = "Avg Random Selected per BarSeq"
   ) +
   theme_minimal()
 print(p)
-ggsave("BarSeq-MapSeq_FPR.pdf", plot = p, device = "pdf", width = 6, height = 6)  
+ggsave("BarSeq-MapSeq_FPR_resolved.pdf", plot = p, device = "pdf", width = 6, height = 6)
 
 #####################################################################################################################################################################################
-# Shuffled BarSeq Data Simulation for FPR estimation
+# Shuffled BarSeq Data Simulation for FPR estimation (UPDATED for resolve_best_unique)
 # Function to shuffle barcode keeping 9th nucleotide fixed
 shuffle_barcode <- function(vbc) {
   chars <- strsplit(vbc, "")[[1]]
@@ -474,9 +561,9 @@ shuffle_barcode <- function(vbc) {
   paste0(new_chars, collapse = "")
 }
 
-# Run Shuffled Matching Simulation
-run_shuffled_matching_simulation <- function(n_simulations, barseq_df, mapseq_split, mapseq_vbcs, max_mismatches) {
-  shuffled_results <- list()
+# Run Shuffled Matching Simulation (apply resolver!)
+run_shuffled_matching_simulation <- function(n_simulations, barseq_df, mapseq_split, mapseq_vbcs, mapseq_df, max_mismatches) {
+  shuffled_results <- vector("list", n_simulations)
   
   for (sim in seq_len(n_simulations)) {
     cat("Running shuffled simulation", sim, "of", n_simulations, "\n")
@@ -491,56 +578,70 @@ run_shuffled_matching_simulation <- function(n_simulations, barseq_df, mapseq_sp
     matches_2 <- match_in_batches(shuffled_df, mapseq_split, mapseq_vbcs, max_dist = 2)
     matches_3 <- match_in_batches(shuffled_df, mapseq_split, mapseq_vbcs, max_dist = 3)
     
-    # Store results
+    # Resolve (same rule as real pipeline)
+    res_0 <- resolve_best_unique(matches_0, mapseq_df)
+    res_1 <- resolve_best_unique(matches_1, mapseq_df)
+    res_2 <- resolve_best_unique(matches_2, mapseq_df)
+    res_3 <- resolve_best_unique(matches_3, mapseq_df)
+    
     shuffled_results[[sim]] <- list(
-      matches_0 = nrow(matches_0),
-      matches_1 = nrow(matches_1),
-      matches_2 = nrow(matches_2),
-      matches_3 = nrow(matches_3)
+      selected_0 = dplyr::n_distinct(res_0$selected$CellID),
+      selected_1 = dplyr::n_distinct(res_1$selected$CellID),
+      selected_2 = dplyr::n_distinct(res_2$selected$CellID),
+      selected_3 = dplyr::n_distinct(res_3$selected$CellID),
+      ties_0 = dplyr::n_distinct(res_0$dropped_ties$CellID),
+      ties_1 = dplyr::n_distinct(res_1$dropped_ties$CellID),
+      ties_2 = dplyr::n_distinct(res_2$dropped_ties$CellID),
+      ties_3 = dplyr::n_distinct(res_3$dropped_ties$CellID)
     )
   }
   
   return(shuffled_results)
 }
 
-# Run shuffled simulations
-if (file.exists("shuffled_simulation_results.rds")) {
-  shuffled_results <- readRDS("shuffled_simulation_results.rds")
+# Run shuffled simulations (use a NEW filename; old file was pre-resolver format)
+shuf_sim_file <- "shuffled_simulation_results_resolved.rds"
+if (file.exists(shuf_sim_file)) {
+  shuffled_results <- readRDS(shuf_sim_file)
 } else {
-  shuffled_results <- run_shuffled_matching_simulation(n_simulations, barseq, mapseq_split, mapseq_vbcs, max_mismatches)
-  saveRDS(shuffled_results, file = "shuffled_simulation_results.rds")
+  shuffled_results <- run_shuffled_matching_simulation(
+    n_simulations, barseq, mapseq_split, mapseq_vbcs, mapseq, max_mismatches
+  )
+  saveRDS(shuffled_results, file = shuf_sim_file)
 }
 
-# Summarize Shuffled Results (reuse the summarize_random_results function)
-shuffled_means <- summarize_random_results(shuffled_results, n_simulations)
+# Summarize Shuffled Results
+shuffled_summary <- summarize_random_results(shuffled_results)
+shuffled_mean_selected <- shuffled_summary$selected_means
+shuffled_mean_ties <- shuffled_summary$ties_means
 
 # Calculate Error Rates for shuffled
-shuffled_error_rates <- calculate_error_rates(shuffled_means, n_barseq)
+shuffled_error_rates_selected <- calculate_error_rates(shuffled_mean_selected, n_barseq)
 
 # Construct shuffled_comparison_df
 shuffled_comparison_df <- data.frame(
   Mismatches = 0:max_mismatches,
-  Real_Matches = real_match_counts,
-  Shuffled_Mean_Matches = round(shuffled_means),
-  Shuffled_Error_Rate = round(shuffled_error_rates, 4)
+  Real_Selected = real_selected_counts,
+  Real_Dropped_Ties = real_ties_counts,
+  Shuffled_Mean_Selected = round(shuffled_mean_selected),
+  Shuffled_Mean_Dropped_Ties = round(shuffled_mean_ties),
+  Shuffled_FPR_Selected = round(shuffled_error_rates_selected, 4)
 )
-shuffled_comparison_df$Avg_Shuffled_Matches_Per_BarSeq <- round(shuffled_means / n_barseq, 3)
+shuffled_comparison_df$Avg_Shuffled_Selected_Per_BarSeq <- round(shuffled_mean_selected / n_barseq, 4)
 
-# Print the shuffled_comparison_df
+# Print and save
 print(shuffled_comparison_df)
+write.csv(shuffled_comparison_df, file = "shuffled_comparison_df_FPR_error_resolved.csv", row.names = FALSE)
 
-# Save shuffled_comparison_df to a CSV file
-write.csv(shuffled_comparison_df, file = "shuffled_comparison_df_FPR_error.csv", row.names = FALSE)
-
-# Visualize Results
-p_shuf <- ggplot(shuffled_comparison_df, aes(x = Mismatches, y = Avg_Shuffled_Matches_Per_BarSeq)) +
+# Visualize Results (SHUFFLED)
+p_shuf <- ggplot(shuffled_comparison_df, aes(x = Mismatches, y = Avg_Shuffled_Selected_Per_BarSeq)) +
   geom_line(color = "red", linewidth = 1) +
   geom_point(color = "red", size = 2) +
   labs(
-    title = "Shuffled Match Rate per BarSeq Match",
+    title = "Shuffled *Selected* Match Rate per BarSeq Cell (post-resolver)",
     x = "Allowed Mismatches",
-    y = "Avg Shuffled Matches per BarSeq"
+    y = "Avg Shuffled Selected per BarSeq"
   ) +
   theme_minimal()
 print(p_shuf)
-ggsave("BarSeq-MapSeq_Shuffled_FPR.pdf", plot = p_shuf, device = "pdf", width = 6, height = 6)
+ggsave("BarSeq-MapSeq_Shuffled_FPR_resolved.pdf", plot = p_shuf, device = "pdf", width = 6, height = 6)

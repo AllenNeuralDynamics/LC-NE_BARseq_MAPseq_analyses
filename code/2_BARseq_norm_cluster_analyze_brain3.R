@@ -86,7 +86,7 @@ p2 <- ggplot(plot_data_genes, aes(x = UMAP1, y = UMAP2, color = TotalGenes)) +
   scale_color_gradient(low = "grey", high = "magenta") +
   theme_minimal() +
   theme(panel.grid = element_blank()) +  # Remove grids
-  labs(title = "Total genes", x = "UMAP1", y = "UMAP2", color = "Gene Count")
+  labs(title = "Total counts", x = "UMAP1", y = "UMAP2", color = "Gene Count")
 
 # Add gene expression levels to the data frame and create gene expression plots
 genes <- c("Dbh", "Th", "Ddc", "Slc18a2")
@@ -272,7 +272,7 @@ p2 <- ggplot(plot_data_genes, aes(x = UMAP1, y = UMAP2, color = TotalGenes)) +
   scale_color_gradient(low = "grey", high = "magenta") +
   theme_minimal() +
   theme(panel.grid = element_blank()) +  # Remove grids
-  labs(title = "Total genes", x = "UMAP1", y = "UMAP2", color = "Gene Count")
+  labs(title = "Total counts", x = "UMAP1", y = "UMAP2", color = "Gene Count")
 
 # Add gene expression levels to the data frame
 genes <- c("Dbh", "Th", "Ddc", "Slc18a2")
@@ -398,7 +398,7 @@ p2 <- ggplot(plot_data_genes, aes(x = UMAP1, y = UMAP2, color = TotalGenes)) +
   scale_color_gradient(low = "grey", high = "magenta") +
   theme_minimal() +
   theme(panel.grid = element_blank()) +  # Remove grids
-  labs(title = "Total genes", x = "UMAP1", y = "UMAP2", color = "Gene Count")
+  labs(title = "Total counts", x = "UMAP1", y = "UMAP2", color = "Gene Count")
 
 # Add gene expression levels to the data frame
 genes <- c("Dbh", "Th", "Ddc", "Slc18a2")
@@ -590,7 +590,7 @@ p2 <- ggplot(plot_data_genes, aes(x = UMAP1, y = UMAP2, color = TotalGenes)) +
   scale_color_gradient(low = "grey", high = "magenta") +
   theme_minimal() +
   theme(panel.grid = element_blank()) +  # Remove grids
-  labs(title = "Total genes", x = "UMAP1", y = "UMAP2", color = "Gene Count")
+  labs(title = "Total counts", x = "UMAP1", y = "UMAP2", color = "Gene Count")
 
 # Add gene expression levels to the data frame
 genes <- c("Dbh", "Th", "Ddc", "Slc18a2")
@@ -943,7 +943,7 @@ p2 <- ggplot(plot_data_genes, aes(x = UMAP1, y = UMAP2, color = TotalGenes)) +
   scale_color_gradient(low = "grey", high = "magenta") +
   theme_minimal() +
   theme(panel.grid = element_blank()) +  # Remove grids
-  labs(title = "Total genes", x = "UMAP1", y = "UMAP2", color = "Gene Count")
+  labs(title = "Total counts", x = "UMAP1", y = "UMAP2", color = "Gene Count")
 
 # Add gene expression levels to the data frame
 genes <- c("Dbh", "Th", "Ddc", "Slc18a2")

@@ -1,144 +1,150 @@
-# Load functions which handle pre-processing or organizing of the data
-source("~/capsule/code/01_loaders_brain3-4_combined.R")
+# # Load functions which handle pre-processing or organizing of the data
+# source("~/capsule/code/01_loaders_brain3-4_combined.R")
+# 
+# brain3 <- load_data_brain3()
+# names(brain3)
+# # Extract components
+# brain3_raw_proj_matrix <- as.data.frame(brain3$proj_matrix_raw)
+# # Preserve original rownames
+# rownames(brain3_raw_proj_matrix) <- rownames(brain3$proj_matrix_raw)
+# brain3_inRH_lookup <- brain3$inRH_lookup
+# brain3_metadata <- brain3$metadata
+# 
+# brain4 <- load_data_brain4()
+# names(brain4)
+# # Extract components
+# brain4_raw_proj_matrix <- as.data.frame(brain4$proj_matrix_raw)
+# # Preserve original rownames
+# rownames(brain4_raw_proj_matrix) <- rownames(brain4$proj_matrix_raw)
+# brain4_inRH_lookup <- brain4$inRH_lookup
+# brain4_metadata <- brain4$metadata
+# 
+# #set working directory to save things to
+# setwd('/scratch/BARseq_780345-780346_combined/')
+# 
+# # Ensure ROI compatibility between brain3 and brain4 ROIs 
+# colnames(brain3_raw_proj_matrix)
+# colnames(brain4_raw_proj_matrix)
+# # Correct Amyg-GPe spelling
+# colnames(brain4_raw_proj_matrix) <- stringr::str_replace_all(colnames(brain4_raw_proj_matrix), "amyg-Gpe", "amyg-GPe")
+# # Sum cerebellum sections into one sample
+# groups <- c("RH.12", "LH.12")
+# for (group in groups) {
+#   i_col <- paste0("cerebellum I_", group)
+#   ii_col <- paste0("cerebellum II_", group)
+#   new_col <- paste0("cerebellum_", group)
+#   if (i_col %in% colnames(brain4_raw_proj_matrix) && ii_col %in% colnames(brain4_raw_proj_matrix)) {
+#     # Sum the projections
+#     brain4_raw_proj_matrix[, new_col] <- brain4_raw_proj_matrix[, i_col] + brain4_raw_proj_matrix[, ii_col]
+#     # Remove the original I and II columns
+#     brain4_raw_proj_matrix <- brain4_raw_proj_matrix[, !(colnames(brain4_raw_proj_matrix) %in% c(i_col, ii_col))]
+#     cat("Summed", i_col, "+", ii_col, "into", new_col, "\n")
+#   } else {
+#     cat("Warning: Columns for", group, "not found\n")
+#   }
+# }
+# 
+# # Sum columns with corresponding base ROI names to enhance dataset compatibility - brain3
+# dim(brain3_raw_proj_matrix)
+# head(brain3_raw_proj_matrix)
+# brain3_result <- sum_by_base_roi(brain3_raw_proj_matrix)
+# brain3_summed <- brain3_result$summed_matrix
+# dim(brain3_summed)
+# head(brain3_summed)
+# brain3_mapping <- brain3_result$mapping
+# cat("Brain3 mapping (what was combined into each base ROI):\n")
+# for (base in names(brain3_mapping)) {
+#   cat(base, ":", paste(brain3_mapping[[base]], collapse = ", "), "\n")
+# }
+# 
+# # Sum columns with corresponding base ROI names to enhance dataset compatibility - brain4
+# dim(brain4_raw_proj_matrix)
+# head(brain4_raw_proj_matrix)
+# brain4_result <- sum_by_base_roi(brain4_raw_proj_matrix)
+# brain4_summed <- brain4_result$summed_matrix
+# dim(brain4_summed)
+# head(brain4_summed)
+# brain4_mapping <- brain4_result$mapping
+# cat("\nBrain4 mapping:\n")
+# for (base in names(brain4_mapping)) {
+#   cat(base, ":", paste(brain4_mapping[[base]], collapse = ", "), "\n")
+# }
+# 
+# # Apply ipsi-contra to brain3 summed matrix
+# ipsi_contra_brain3 <- create_ipsi_contra_from_matrix(brain3_summed, brain3_inRH_lookup, "brain3 summed")
+# head(ipsi_contra_brain3)
+# 
+# # Apply ipsi-contra to brain4 summed matrix
+# ipsi_contra_brain4 <- create_ipsi_contra_from_matrix(brain4_summed, brain4_inRH_lookup, "brain4 summed")
+# head(ipsi_contra_brain4)
+# 
+# # Get column names from the ipsi-contra matrices
+# brain3_cols <- colnames(ipsi_contra_brain3)
+# brain4_cols <- colnames(ipsi_contra_brain4)
+# # Find shared regions (exact matches)
+# shared_regions <- intersect(brain3_cols, brain4_cols)
+# # Find unique regions
+# unique_brain3 <- setdiff(brain3_cols, brain4_cols)
+# unique_brain4 <- setdiff(brain4_cols, brain3_cols)
+# # Print results
+# cat("Shared regions (", length(shared_regions), "):\n")
+# if (length(shared_regions) > 0) {
+#   cat(paste(sort(shared_regions), collapse = ", "), "\n\n")
+# }
+# cat("Unique to brain3 (", length(unique_brain3), "):\n")
+# if (length(unique_brain3) > 0) {
+#   cat(paste(sort(unique_brain3), collapse = ", "), "\n\n")
+# }
+# cat("Unique to brain4 (", length(unique_brain4), "):\n")
+# if (length(unique_brain4) > 0) {
+#   cat(paste(sort(unique_brain4), collapse = ", "), "\n\n")
+# }
+# 
+# # Subset to shared regions
+# brain3_shared <- ipsi_contra_brain3[, shared_regions, drop = FALSE]
+# head(brain3_shared)
+# brain4_shared <- ipsi_contra_brain4[, shared_regions, drop = FALSE]
+# head(brain4_shared)
+# 
+# # Normalize each subset
+# brain3_shared_norm <- normalize_projection_matrix(brain3_shared, "brain3 shared ipsi-contra")
+# head(brain3_shared_norm)
+# brain4_shared_norm <- normalize_projection_matrix(brain4_shared, "brain4 shared ipsi-contra")
+# head(brain4_shared_norm)
+# 
+# # Combine the normalized subsets
+# combined_norm <- as.data.frame(rbind(brain3_shared_norm, brain4_shared_norm))
+# head(combined_norm)
+# cat("Combined normalized matrix dimensions:", dim(combined_norm), "\n")
+# 
+# # Preserve rownames before conversion
+# original_rownames <- rownames(combined_norm)
+# # Convert to numeric matrix
+# combined_norm <- as.matrix(combined_norm)
+# combined_norm <- apply(combined_norm, 2, as.numeric)  # Ensure numeric
+# combined_norm <- as.matrix(combined_norm)
+# # Reassign rownames
+# rownames(combined_norm) <- original_rownames
+# head(combined_norm) 
 
-brain3 <- load_data_brain3()
-names(brain3)
-# Extract components
-brain3_raw_proj_matrix <- as.data.frame(brain3$proj_matrix_raw)
-# Preserve original rownames
-rownames(brain3_raw_proj_matrix) <- rownames(brain3$proj_matrix_raw)
-brain3_inRH_lookup <- brain3$inRH_lookup
-brain3_metadata <- brain3$metadata
 
-brain4 <- load_data_brain4()
-names(brain4)
-# Extract components
-brain4_raw_proj_matrix <- as.data.frame(brain4$proj_matrix_raw)
-# Preserve original rownames
-rownames(brain4_raw_proj_matrix) <- rownames(brain4$proj_matrix_raw)
-brain4_inRH_lookup <- brain4$inRH_lookup
-brain4_metadata <- brain4$metadata
+source("~/capsule/code/02_prepare_brain3_4_combined_inputs.R")
 
-#set working directory to save things to
-setwd('/scratch/BARseq_780345-780346_combined/')
+OUT_DIR <- "/scratch/BARseq_780345-780346_combined/"
 
-# Ensure ROI compatibility between brain3 and brain4 ROIs 
-colnames(brain3_raw_proj_matrix)
-colnames(brain4_raw_proj_matrix)
-# Correct Amyg-GPe spelling
-colnames(brain4_raw_proj_matrix) <- stringr::str_replace_all(colnames(brain4_raw_proj_matrix), "amyg-Gpe", "amyg-GPe")
-# Sum cerebellum sections into one sample
-groups <- c("RH.12", "LH.12")
-for (group in groups) {
-  i_col <- paste0("cerebellum I_", group)
-  ii_col <- paste0("cerebellum II_", group)
-  new_col <- paste0("cerebellum_", group)
-  if (i_col %in% colnames(brain4_raw_proj_matrix) && ii_col %in% colnames(brain4_raw_proj_matrix)) {
-    # Sum the projections
-    brain4_raw_proj_matrix[, new_col] <- brain4_raw_proj_matrix[, i_col] + brain4_raw_proj_matrix[, ii_col]
-    # Remove the original I and II columns
-    brain4_raw_proj_matrix <- brain4_raw_proj_matrix[, !(colnames(brain4_raw_proj_matrix) %in% c(i_col, ii_col))]
-    cat("Summed", i_col, "+", ii_col, "into", new_col, "\n")
-  } else {
-    cat("Warning: Columns for", group, "not found\n")
-  }
-}
+prep <- prepare_brain3_4_inputs(
+  loaders_path = "~/capsule/code/01_loaders_brain3-4_combined.R",
+  out_dir = OUT_DIR,
+  verbose = TRUE,
+  return_intermediates = TRUE,
+  restore_wd = FALSE
+)
 
-# Sum columns with corresponding base ROI names to enhance dataset compatibility - brain3
-dim(brain3_raw_proj_matrix)
-head(brain3_raw_proj_matrix)
-brain3_result <- sum_by_base_roi(brain3_raw_proj_matrix)
-brain3_summed <- brain3_result$summed_matrix
-dim(brain3_summed)
-head(brain3_summed)
-brain3_mapping <- brain3_result$mapping
-cat("Brain3 mapping (what was combined into each base ROI):\n")
-for (base in names(brain3_mapping)) {
-  cat(base, ":", paste(brain3_mapping[[base]], collapse = ", "), "\n")
-}
+setwd(OUT_DIR)  # explicit, guarantees downstream saves go here
 
-# Sum columns with corresponding base ROI names to enhance dataset compatibility - brain4
-dim(brain4_raw_proj_matrix)
-head(brain4_raw_proj_matrix)
-brain4_result <- sum_by_base_roi(brain4_raw_proj_matrix)
-brain4_summed <- brain4_result$summed_matrix
-dim(brain4_summed)
-head(brain4_summed)
-brain4_mapping <- brain4_result$mapping
-cat("\nBrain4 mapping:\n")
-for (base in names(brain4_mapping)) {
-  cat(base, ":", paste(brain4_mapping[[base]], collapse = ", "), "\n")
-}
-
-# Apply ipsi-contra to brain3 summed matrix
-ipsi_contra_brain3 <- create_ipsi_contra_from_matrix(brain3_summed, brain3_inRH_lookup, "brain3 summed")
-head(ipsi_contra_brain3)
-
-# Apply ipsi-contra to brain4 summed matrix
-ipsi_contra_brain4 <- create_ipsi_contra_from_matrix(brain4_summed, brain4_inRH_lookup, "brain4 summed")
-head(ipsi_contra_brain4)
-
-# Get column names from the ipsi-contra matrices
-brain3_cols <- colnames(ipsi_contra_brain3)
-brain4_cols <- colnames(ipsi_contra_brain4)
-# Find shared regions (exact matches)
-shared_regions <- intersect(brain3_cols, brain4_cols)
-# Find unique regions
-unique_brain3 <- setdiff(brain3_cols, brain4_cols)
-unique_brain4 <- setdiff(brain4_cols, brain3_cols)
-# Print results
-cat("Shared regions (", length(shared_regions), "):\n")
-if (length(shared_regions) > 0) {
-  cat(paste(sort(shared_regions), collapse = ", "), "\n\n")
-}
-cat("Unique to brain3 (", length(unique_brain3), "):\n")
-if (length(unique_brain3) > 0) {
-  cat(paste(sort(unique_brain3), collapse = ", "), "\n\n")
-}
-cat("Unique to brain4 (", length(unique_brain4), "):\n")
-if (length(unique_brain4) > 0) {
-  cat(paste(sort(unique_brain4), collapse = ", "), "\n\n")
-}
-
-# Subset to shared regions
-brain3_shared <- ipsi_contra_brain3[, shared_regions, drop = FALSE]
-head(brain3_shared)
-brain4_shared <- ipsi_contra_brain4[, shared_regions, drop = FALSE]
-head(brain4_shared)
-
-# Normalize each subset
-brain3_shared_norm <- normalize_projection_matrix(brain3_shared, "brain3 shared ipsi-contra")
-head(brain3_shared_norm)
-brain4_shared_norm <- normalize_projection_matrix(brain4_shared, "brain4 shared ipsi-contra")
-head(brain4_shared_norm)
-
-# Combine the normalized subsets
-combined_norm <- as.data.frame(rbind(brain3_shared_norm, brain4_shared_norm))
-head(combined_norm)
-cat("Combined normalized matrix dimensions:", dim(combined_norm), "\n")
-
-# Preserve rownames before conversion
-original_rownames <- rownames(combined_norm)
-# Convert to numeric matrix
-combined_norm <- as.matrix(combined_norm)
-combined_norm <- apply(combined_norm, 2, as.numeric)  # Ensure numeric
-combined_norm <- as.matrix(combined_norm)
-# Reassign rownames
-rownames(combined_norm) <- original_rownames
-head(combined_norm) 
-
-#############################################################################################################################
-# # Subset data to only include cells which pass visual QC for segmentation accuracy
-# good_cells <- read.csv("LC_visualQC_barcoded_cells.csv")
-# # Get the uids of good barcoded cells
-# good_uids <- good_cells$uid[good_cells$good_barcoded == 1]
-# # Extract the base uid from rownames of mat_ordered (remove .1, .2, etc.)
-# base_rownames <- sub("\\.[0-9]+$", "", rownames(mat_ordered))
-# # Subset mat_ordered to only include rows with base uid in good_uids
-# mat_ordered <- mat_ordered[base_rownames %in% good_uids, ]
-# # Subset inRH_lookup in the same way
-# inRH_lookup <- inRH_lookup[base_rownames %in% good_uids, , drop = FALSE]
-#############################################################################################################################
+combined_norm <- prep$combined_norm
+combined_metadata <- prep$combined_metadata     
+combined_inRH_lookup <- prep$combined_inRH_lookup
 
 # Plot heatmap of log-norm projections
 heatmap.2(combined_norm, 
@@ -400,6 +406,10 @@ ggsave(
   units = "in"
 )
 
+# Save rank diagnostics tables
+write.csv(metrics_df,  "NMF_rank_metrics.csv", row.names = FALSE)
+write.csv(sparsity_df, "NMF_rank_sparsity.csv", row.names = FALSE)
+
 ##########################################################################################################################################
 # Record parameters, make sure that cell loading per factor makes sense
 # W: factors x cells (from NMF result)
@@ -423,12 +433,12 @@ table(cell_factors$factor)
 # collapse factors into anterior and posterior projecting, and annotate major projeciton groups
 cell_factors <- cell_factors %>%
   mutate(
-    proj_pattern = ifelse(factor %in% c(4), "Posterior", "Anterior"),
+    proj_pattern = ifelse(factor %in% c(3), "Posterior", "Anterior"),
     proj_target  = case_when(
-      factor == 4 ~ "medulla-SP",
-      factor == 2 ~ "dorsal_ctx-hippocamp",
-      factor == 1 ~ "midbrain-hindbrain",
-      factor == 3 ~ "olf_ventral_ctx",
+      factor == 3 ~ "medulla-SP",
+      factor == 4 ~ "dorsal_ctx-hippocamp",
+      factor == 2 ~ "midbrain-hindbrain",
+      factor == 1 ~ "olf_ventral_ctx",
       TRUE        ~ NA_character_
     )
   )
@@ -489,10 +499,116 @@ heatmap.2(W_factor_relmax,
 dev.copy(pdf, "heatmap_W_factor_relmax.pdf", width = 8, height = 8)
 dev.off()
 
+# Results section statistics
+## =========================
+## NMF RESULTS EXTRACTION 
+## =========================
+
+## ---- 0) Combine rank diagnostics into one table you can paste into Results ----
+rank_diag_df <- merge(metrics_df, sparsity_df, by = "rank", all.x = TRUE)
+rank_diag_df <- rank_diag_df[order(rank_diag_df$rank), ]
+print(rank_diag_df)
+
+## ---- 1) Helper: safe Gini (prevents divide-by-zero edge cases) ----
+gini_safe <- function(x) {
+  x <- as.numeric(x)
+  x <- x[is.finite(x)]
+  if (!length(x)) return(NA_real_)
+  s <- sum(x)
+  if (s <= 0) return(NA_real_)
+  x <- sort(x)
+  n <- length(x)
+  1 - (2 * sum((n:1) * x) / (n * s)) + (1 / n)
+}
+
+## ---- 2) Summaries for a selected rank (set sel_rank) ----
+summarize_nmf_rank <- function(nmf_res, sel_rank, top_k = 8, purity_thr = 0.7) {
+  obj <- nmf_res[[paste0("r", sel_rank)]]
+  if (is.null(obj)) stop("Could not find nmf_results[['r", sel_rank, "']].")
+  
+  W <- obj$W   # factors x cells  (from coef)
+  H <- obj$H   # ROIs x factors   (from basis)
+  
+  stopifnot(is.matrix(W), is.matrix(H))
+  stopifnot(nrow(W) == ncol(H))       # factors match
+  stopifnot(ncol(W) == nrow(obj$consensus_matrix) || TRUE) # consensus dims check (optional)
+  stopifnot(all(W >= 0, na.rm=TRUE), all(H >= 0, na.rm=TRUE))
+  
+  ## ---- A) Cells per factor (hard assignment) ----
+  factor_per_cell <- apply(W, 2, which.max)
+  cell_counts <- as.data.frame(sort(table(factor_per_cell), decreasing = TRUE))
+  colnames(cell_counts) <- c("factor", "n_cells")
+  cell_counts$factor <- as.integer(as.character(cell_counts$factor))
+  
+  ## ---- B) Membership “purity” (how strongly a cell prefers one factor) ----
+  W_cellnorm <- sweep(W, 2, colSums(W), FUN = "/")
+  W_cellnorm[!is.finite(W_cellnorm)] <- NA_real_
+  
+  max_membership <- apply(W_cellnorm, 2, max, na.rm = TRUE)
+  second_membership <- apply(W_cellnorm, 2, function(x) sort(x, decreasing=TRUE, na.last=TRUE)[2])
+  margin12 <- max_membership - second_membership
+  
+  purity_summary <- list(
+    n_cells = length(max_membership),
+    frac_max_ge_thr = mean(max_membership >= purity_thr, na.rm = TRUE),
+    max_membership_summary = summary(max_membership),
+    margin12_summary = summary(margin12)
+  )
+  
+  ## ---- C) Top ROIs per factor from H (ROIs x factors) ----
+  top_H <- do.call(rbind, lapply(seq_len(ncol(H)), function(k) {
+    v <- H[, k]
+    o <- order(v, decreasing = TRUE)
+    o <- head(o, top_k)
+    data.frame(
+      factor = k,
+      ROI = rownames(H)[o],
+      loading = as.numeric(v[o]),
+      row.names = NULL
+    )
+  }))
+  
+  ## ---- D) Optional: “how many cells substantially express each factor” ----
+  factor_support <- do.call(rbind, lapply(seq_len(nrow(W_cellnorm)), function(k) {
+    w <- W_cellnorm[k, ]
+    data.frame(
+      factor = k,
+      n_cells_ge_0.1 = sum(w >= 0.1, na.rm=TRUE),
+      n_cells_ge_0.3 = sum(w >= 0.3, na.rm=TRUE),
+      n_cells_ge_0.5 = sum(w >= 0.5, na.rm=TRUE),
+      row.names = NULL
+    )
+  }))
+  
+  ## ---- E) Sanity: factor sparsity at this rank (mean gini across factors) ----
+  factor_ginis <- apply(H, 2, gini_safe)
+  sparsity_this_rank <- mean(factor_ginis, na.rm = TRUE)
+  
+  list(
+    rank = sel_rank,
+    cell_counts = cell_counts,
+    purity_summary = purity_summary,
+    top_H = top_H,
+    factor_support = factor_support,
+    factor_ginis = factor_ginis,
+    mean_factor_sparsity_gini = sparsity_this_rank
+  )
+}
+
+## ---- RUN for your chosen rank (you’ve been using rank 4) ----
+sel_rank <- 4
+nmf_sel <- summarize_nmf_rank(nmf_results, sel_rank = sel_rank, top_k = 8, purity_thr = 0.7)
+
+nmf_sel$cell_counts
+nmf_sel$purity_summary
+head(nmf_sel$top_H, 24)
+nmf_sel$factor_support
+nmf_sel$mean_factor_sparsity_gini
 
 
 
-
+##########################################################################################################################################
+##########################################################################################################################################
 ##########################################################################################################################################
 # check how factor loading relates to transcriptomic identity
 # ensure that only data from properly segmented cells is being utilized here

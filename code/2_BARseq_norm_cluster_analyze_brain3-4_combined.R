@@ -129,7 +129,7 @@ p2 <- ggplot(plot_data_genes, aes(x = UMAP1, y = UMAP2, color = TotalGenes)) +
   scale_color_gradient(low = "grey", high = "magenta") +
   theme_minimal() +
   theme(panel.grid = element_blank()) +  # Remove grids
-  labs(title = "Total Genes", x = "UMAP1", y = "UMAP2", color = "Gene Count")
+  labs(title = "Total counts", x = "UMAP1", y = "UMAP2", color = "Gene Count")
 
 p3 <- ggplot(plot_data_batch, aes(x = UMAP1, y = UMAP2, color = batch)) +
   geom_point(size = 0.01, alpha = 0.1) +  # Smaller point size, alpha for density
@@ -384,7 +384,7 @@ p2 <- ggplot(plot_data_genes, aes(x = UMAP1, y = UMAP2, color = TotalGenes)) +
   scale_color_gradient(low = "grey", high = "magenta") +
   theme_minimal() +
   theme(panel.grid = element_blank()) +  # Remove grids
-  labs(title = "Total genes", x = "UMAP1", y = "UMAP2", color = "Gene Count")
+  labs(title = "Total counts", x = "UMAP1", y = "UMAP2", color = "Gene Count")
 
 # Plot UMAP with batch
 p3 <- ggplot(plot_data_batch, aes(x = UMAP1, y = UMAP2, color = batch)) +
@@ -519,7 +519,7 @@ p2 <- ggplot(plot_data_genes, aes(x = UMAP1, y = UMAP2, color = TotalGenes)) +
   scale_color_gradient(low = "grey", high = "magenta") +
   theme_minimal() +
   theme(panel.grid = element_blank()) +  # Remove grids
-  labs(title = "Total genes", x = "UMAP1", y = "UMAP2", color = "Gene Count")
+  labs(title = "Total counts", x = "UMAP1", y = "UMAP2", color = "Gene Count")
 
 # Plot UMAP with batch
 p3 <- ggplot(plot_data_batch, aes(x = UMAP1, y = UMAP2, color = batch)) +
@@ -879,7 +879,7 @@ p2 <- ggplot(plot_data_genes, aes(x = UMAP1, y = UMAP2, color = TotalGenes)) +
   scale_color_gradient(low = "grey", high = "magenta") +
   theme_minimal() +
   theme(panel.grid = element_blank()) +  # Remove grids
-  labs(title = "Total genes", x = "UMAP1", y = "UMAP2", color = "Gene Count")
+  labs(title = "Total counts", x = "UMAP1", y = "UMAP2", color = "Gene Count")
 
 # Plot UMAP with batch
 p3 <- ggplot(plot_data_batch, aes(x = UMAP1, y = UMAP2, color = batch)) +
@@ -1512,7 +1512,7 @@ geom_point(size = 0.05) +  # Smaller point size
 scale_color_gradient(low = "grey", high = "magenta") +
 theme_minimal() +
 theme(panel.grid = element_blank()) +  # Remove grids
-labs(title = "Total genes", x = "UMAP1", y = "UMAP2", color = "Gene Count")
+labs(title = "Total counts", x = "UMAP1", y = "UMAP2", color = "Gene Count")
 # Plot UMAP with batch
 p3 <- ggplot(plot_data_batch, aes(x = UMAP1, y = UMAP2, color = batch)) +
 geom_point(size = 0.01, alpha = 0.1) +  # Smaller point size, alpha for density

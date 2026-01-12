@@ -36,6 +36,8 @@ library(cowplot)
 library(ggrepel)
 library(limma)
 library(edgeR)
+library(readr)
+library(tibble)
 
 # Conversion of BARseq MATLAB files to RDS files used downstream happens in capsule https://codeocean.allenneuraldynamics.org/capsule/6190503/tree [PK_BARseq_MAT-RDS_conversion]
 # due to impossibility of mounting library(hdf5r) in the current environment build

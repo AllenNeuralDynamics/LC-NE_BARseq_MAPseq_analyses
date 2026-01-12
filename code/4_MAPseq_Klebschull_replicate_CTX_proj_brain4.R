@@ -73,13 +73,23 @@ rn <- rownames(df)
 dot_counts <- lengths(regmatches(rn, gregexpr("\\.", rn)))
 table(dot_counts)
 
-df <- df[, !(colnames(df) %in% c("CellID", "dist", "vbc_read", "louvain_cluster", "row_id"))]
+id_col    <- "CellID"
+drop_cols <- c("dist", "vbc_read", "louvain_cluster", "row_id", "barcode")
+
+meta_key <- df %>%
+  tibble::rownames_to_column("rowname") %>%
+  dplyr::select(rowname, CellID, slice, barcode, vbc_read, louvain_cluster, CCF_AP, CCF_DV, CCF_ML, inRH)
+
+df_dropped <- df %>% dplyr::select(all_of(c(id_col, drop_cols)))
+df_dropped <- df_dropped %>% tibble::rownames_to_column("rowname")
+df         <- df %>% dplyr::select(-all_of(c(id_col, drop_cols)))
+
 print(colnames(df))
 
 ###################################################### barcode counts sanity check ###############################################################
 # Plot histogram of raw value distributions for all columns to look at general barcode expression levels
 # Specify metadata columns to exclude
-exclude_cols <- c("slice", "barcode","CCF_AP", "CCF_DV", "CCF_ML", "inRH")
+exclude_cols <- c("slice", "CCF_AP", "CCF_DV", "CCF_ML", "inRH")
 # Select only projection columns for plotting
 proj_df <- df[, !(colnames(df) %in% exclude_cols)]
 
@@ -253,8 +263,8 @@ plot_cells_in_batches <- function(df_long, batch_size = 16, save = FALSE, prefix
 }
 
 # Usage:
-plot_cells_in_batches(df_subset_longRH, batch_size = 20, save = TRUE, prefix = "RH_ctx_cells", title_prefix = "RH somas projecting to RH ctx")
-plot_cells_in_batches(df_subset_longLH, batch_size = 20, save = TRUE, prefix = "LH_ctx_cells", title_prefix = "LH somas projecting to LH ctx")
+plot_cells_in_batches(df_subset_longRH, batch_size = 30, save = TRUE, prefix = "RH_ctx_cells", title_prefix = "RH somas projecting to RH ctx")
+plot_cells_in_batches(df_subset_longLH, batch_size = 30, save = TRUE, prefix = "LH_ctx_cells", title_prefix = "LH somas projecting to LH ctx")
 
 ########################################################### sum across ctx sections to mimic Justus's slice data and Mathew's ExA-SPIM flow ##########################################################
 head(df)
@@ -318,7 +328,7 @@ ctx_long <- ctx_df_nonzero %>%
 ctx_long$ROI <- factor(ctx_long$ROI, levels = colnames(ctx_df))
 
 # Plot function (similar to before)
-plot_cells_in_batches(ctx_long, batch_size = 25, save = TRUE, prefix = "ctx_slices", title_prefix = "Cells projecting to ctx slices")
+plot_cells_in_batches(ctx_long, batch_size = 30, save = TRUE, prefix = "ctx_slices", title_prefix = "Cells projecting to ctx slices")
 
 #####################################################################################################################################################################################
 # Identify cells with 'duplicate' ctx projection profiles and check whether those are true duplicates in the full dataset or apparent duplicates based on subset of ctx regions
@@ -377,7 +387,7 @@ compare_full_profiles(dup_RH, df)
 compare_full_profiles(dup_LH, df)
 
 # This comparison only checks numeric entries, not metadata
-exclude_cols <- c("slice", "barcode", "CCF_AP", "CCF_DV", "CCF_ML", "inRH")
+exclude_cols <- c("slice", "CCF_AP", "CCF_DV", "CCF_ML", "inRH")
 full_proj_df <- df[, !(colnames(df) %in% exclude_cols)]
 compare_full_profiles(dup_ctx, full_proj_df)
 compare_full_profiles(dup_RH, full_proj_df)
@@ -386,6 +396,7 @@ compare_full_profiles(dup_LH, full_proj_df)
 #####################################################################################################################################################################################
 #####################################################################################################################################################################################
 # Identify duplicate cells across the entire projection table - aka cells which have different metadata, but identical MAPseq profiles across all regions
+# MAPseq-profile duplicates
 head(full_proj_df)
 proj_matrix <- as.data.frame(full_proj_df)
 profile_hash <- apply(proj_matrix, 1, function(x) digest(x, algo = "md5"))
@@ -405,99 +416,107 @@ dup_df <- data.frame(
 dup_df <- dup_df[dup_df$profile_hash %in% dup_hashes, ]
 # inspect groups
 dup_groups <- split(dup_df$CellID, dup_df$profile_hash)
-dup_groups
+dup_groups_mapseq <- dup_groups
+length(dup_groups_mapseq)
+head(dup_groups_mapseq)
 
-# Function to compute Euclidean distance between two points in 3D
-euclidean_distance <- function(coord1, coord2) {
-  sqrt(sum((coord1 - coord2)^2))
-}
-# Function to compute pairwise distances for a group of cells
-compute_group_distances <- function(cell_ids, df) {
-  # Extract CCF coordinates for the cells
-  coords <- df[cell_ids, c("CCF_AP", "CCF_DV", "CCF_ML")]
-  # Get all pairs
-  pairs <- combn(cell_ids, 2, simplify = FALSE)
-  # Compute distances for each pair
-  distances <- sapply(pairs, function(pair) {
-    coord1 <- as.numeric(coords[pair[1], ])
-    coord2 <- as.numeric(coords[pair[2], ])
-    euclidean_distance(coord1, coord2)
-  })
+# Identify duplicate BARseq barcodes (vbc_read) across rows
+find_duplicate_vbc_groups <- function(meta_key, vbc_col = "vbc_read", min_group_size = 2) {
+  stopifnot("rowname" %in% names(meta_key))
+  stopifnot(vbc_col %in% names(meta_key))
   
-  # Create a data frame for the results
-  pair_df <- do.call(rbind, lapply(pairs, function(p) data.frame(cell1 = p[1], cell2 = p[2])))
-  pair_df$distance_voxels <- distances
-  pair_df$distance_microns <- distances * 25  # Assuming 25um per voxel
-  return(pair_df)
+  vbc_groups <- meta_key %>%
+    dplyr::filter(!is.na(.data[[vbc_col]]), .data[[vbc_col]] != "") %>%
+    dplyr::group_by(.data[[vbc_col]]) %>%
+    dplyr::summarise(cells = list(rowname), n = dplyr::n(), .groups = "drop") %>%
+    dplyr::filter(n >= min_group_size)
+  
+  # Convert to named list like your existing dup_groups
+  out <- vbc_groups$cells
+  names(out) <- as.character(vbc_groups[[vbc_col]])
+  out
+}
+dup_vbc_groups <- find_duplicate_vbc_groups(meta_key, vbc_col = "vbc_read")
+length(dup_vbc_groups)
+head(dup_vbc_groups)
+
+#####################################################################################################################################################################################
+# Build a cell-centric registry: ONE ROW PER CELL 
+# (Use all cells as base; later filter to only duplicated cells for plotting.)
+# helper: cell -> semicolon-separated group ids
+group_membership_table <- function(group_list, group_colname) {
+  tibble::tibble(
+    Cell = unlist(group_list, use.names = FALSE),
+    group = rep(names(group_list), times = lengths(group_list))
+  ) %>%
+    dplyr::group_by(Cell) %>%
+    dplyr::summarise(!!group_colname := paste(unique(group), collapse = ";"), .groups = "drop")
 }
 
-# Compute distances for all duplicate groups
-all_distances <- lapply(names(dup_groups), function(hash) {
-  cells <- dup_groups[[hash]]
-  if (length(cells) > 1) {
-    dist_df <- compute_group_distances(cells, df)
-    dist_df$group_hash <- hash
-    return(dist_df)
-  } else {
-    return(NULL)
-  }
-})
-# Combine into a single data frame
-distance_table <- do.call(rbind, all_distances)
-# View the table
-print(distance_table)
+mapseq_membership <- group_membership_table(dup_groups_mapseq, rlang::sym("MAPseq_group"))
+vbc_membership    <- group_membership_table(dup_vbc_groups,    rlang::sym("vbc_read_group"))
 
-# Sanity check: Print CCF coordinates for each pair to verify distances
-sanity_check <- function(distance_table, df) {
-  check_df <- data.frame()
-  for (i in 1:nrow(distance_table)) {
-    cell1 <- distance_table$cell1[i]
-    cell2 <- distance_table$cell2[i]
-    coord1 <- df[cell1, c("CCF_AP", "CCF_DV", "CCF_ML")]
-    coord2 <- df[cell2, c("CCF_AP", "CCF_DV", "CCF_ML")]
-    temp_df <- data.frame(
-      group_hash = distance_table$group_hash[i],
-      cell1 = cell1,
-      AP1 = coord1$CCF_AP, DV1 = coord1$CCF_DV, ML1 = coord1$CCF_ML,
-      cell2 = cell2,
-      AP2 = coord2$CCF_AP, DV2 = coord2$CCF_DV, ML2 = coord2$CCF_ML,
-      distance_voxels = distance_table$distance_voxels[i],
-      distance_microns = distance_table$distance_microns[i]
+dup_registry <- tibble::tibble(Cell = rownames(df)) %>%
+  dplyr::left_join(mapseq_membership, by = "Cell") %>%
+  dplyr::left_join(vbc_membership,    by = "Cell") %>%
+  dplyr::mutate(
+    MAPseq_profile_dup = !is.na(MAPseq_group) & MAPseq_group != "",
+    BARseq_vbc_dup     = !is.na(vbc_read_group) & vbc_read_group != "",
+    dup_class = dplyr::case_when(
+      MAPseq_profile_dup & BARseq_vbc_dup ~ "Both",
+      MAPseq_profile_dup ~ "MAPseq_only",
+      BARseq_vbc_dup     ~ "BARseq_only",
+      TRUE ~ "None"
     )
-    check_df <- rbind(check_df, temp_df)
-  }
-  return(check_df)
+  )
+
+# Add coords
+coords <- df[, c("CCF_ML", "CCF_DV", "CCF_AP", "inRH"), drop = FALSE] %>%
+  tibble::rownames_to_column("Cell")
+dup_registry <- dplyr::left_join(dup_registry, coords, by = "Cell")
+
+# Checks
+table(dup_registry$MAPseq_profile_dup, useNA = "ifany")
+table(dup_registry$BARseq_vbc_dup, useNA = "ifany")
+table(dup_registry$dup_class)
+
+# Create plotting df
+dup_plot <- dup_registry %>%
+  dplyr::filter(MAPseq_profile_dup | BARseq_vbc_dup)
+
+#####################################################################################################################################################################################
+# DUPLICATE GROUP DIAGNOSTICS + PLOTTING (single run; faceted; pair table collapsed with flags)
+# Build mapping between VBC groups and MAPseq hash groups (same partition, different order)
+sig <- function(group_list) {
+  vapply(group_list, function(x) paste(sort(x), collapse = "|"), character(1))
 }
-sanity_table <- sanity_check(distance_table, df)
-print(sanity_table)
-write.csv(sanity_table, "duplicate_positions_sanity_table.csv")
 
-library(ggrepel)
-# Build a plotting table for all duplicate groups
-plot_df <- lapply(names(dup_groups), function(hash) {
-  cells <- dup_groups[[hash]]
-  
-  df_subset <- df[cells, c("CCF_ML", "CCF_DV", "CCF_AP")]
+mapseq_sig_to_id <- setNames(names(dup_groups_mapseq), sig(dup_groups_mapseq))
+vbc_sigs <- sig(dup_vbc_groups)
+
+vbc_to_mapseq <- setNames(mapseq_sig_to_id[vbc_sigs], names(dup_vbc_groups))
+stopifnot(all(!is.na(vbc_to_mapseq)))  # must map 1:1
+
+# Create plotting df (faceted style; label includes both IDs)
+plot_df <- lapply(names(dup_vbc_groups), function(vbc_id) {
+  cells <- dup_vbc_groups[[vbc_id]]
+  df_subset <- df[cells, c("CCF_ML", "CCF_DV", "CCF_AP"), drop = FALSE]
   df_subset$CellID <- rownames(df_subset)
-  df_subset$group_hash <- hash
-  
+  df_subset$group_hash <- paste0("VBC_", vbc_id, "\nMAPseqHash_", vbc_to_mapseq[[vbc_id]])
   df_subset
-}) %>% bind_rows()
+}) %>% dplyr::bind_rows()
 
-# Factor ensures consistent facet ordering
 plot_df$group_hash <- factor(plot_df$group_hash)
 
-# Modify plot_df to add a color column based on cell order within each group
 plot_df <- plot_df %>%
-  group_by(group_hash) %>%
-  mutate(cell_order = row_number(),
-         color = ifelse(cell_order == 1, "green", "red")) %>%
-  ungroup()
+  dplyr::group_by(group_hash) %>%
+  dplyr::mutate(cell_order = dplyr::row_number(),
+                color = ifelse(cell_order == 1, "green", "red")) %>%
+  dplyr::ungroup()
 
-# Updated plot with ggrepel for non-overlapping labels and colored points
 p <- ggplot(plot_df, aes(x = CCF_ML, y = CCF_DV, label = CellID, color = color)) +
   geom_point(size = 2) +
-  geom_text_repel(nudge_y = 15, size = 2.4, show.legend = FALSE) +  # Use repel for better label placement
+  geom_text_repel(nudge_y = 15, size = 2.4, show.legend = FALSE) +
   scale_color_manual(values = c("green", "red")) +
   facet_wrap(~ group_hash) +
   theme_minimal() +
@@ -508,128 +527,198 @@ p <- ggplot(plot_df, aes(x = CCF_ML, y = CCF_DV, label = CellID, color = color))
     color = "Cell Order"
   ) +
   coord_fixed() +
-  theme(legend.position = "bottom")  # Optional: move legend to bottom
+  theme(legend.position = "bottom")
 
 print(p)
 ggsave("duplicate_cells_coronal_plane_plot.pdf", p, width = 12, height = 10)
 
+# Pairwise distance table computed ONCE per group, then collapsed to one row per pair with flags
+euclidean_distance <- function(coord1, coord2) {
+  sqrt(sum((coord1 - coord2)^2))
+}
+
+compute_group_distances <- function(cell_ids, df) {
+  coords <- df[cell_ids, c("CCF_AP", "CCF_DV", "CCF_ML")]
+  pairs <- combn(cell_ids, 2, simplify = FALSE)
+  distances <- sapply(pairs, function(pair) {
+    coord1 <- as.numeric(coords[pair[1], ])
+    coord2 <- as.numeric(coords[pair[2], ])
+    euclidean_distance(coord1, coord2)
+  })
+  pair_df <- do.call(rbind, lapply(pairs, function(p) data.frame(cell1 = p[1], cell2 = p[2])))
+  pair_df$distance_voxels  <- distances
+  pair_df$distance_microns <- distances * 25
+  return(pair_df)
+}
+
+# Build uncollapsed pair rows with group_hash
+all_distances <- lapply(names(dup_vbc_groups), function(vbc_id) {
+  cells <- dup_vbc_groups[[vbc_id]]
+  if (length(cells) > 1) {
+    dist_df <- compute_group_distances(cells, df)
+    dist_df$group_hash <- paste0("VBC_", vbc_id, "|MAPseqHash_", vbc_to_mapseq[[vbc_id]])
+    return(dist_df)
+  } else {
+    return(NULL)
+  }
+})
+distance_table_raw <- do.call(rbind, all_distances)
+
+# Collapse: one row per unordered pair
+canon_pair <- function(a, b) {
+  ifelse(a < b, paste(a, b, sep = "|"), paste(b, a, sep = "|"))
+}
+
+distance_table <- distance_table_raw %>%
+  dplyr::mutate(pair_id = canon_pair(cell1, cell2)) %>%
+  dplyr::group_by(pair_id) %>%
+  dplyr::summarise(
+    cell1 = dplyr::first(ifelse(cell1 < cell2, cell1, cell2)),
+    cell2 = dplyr::first(ifelse(cell1 < cell2, cell2, cell1)),
+    distance_voxels  = dplyr::first(distance_voxels),
+    distance_microns = dplyr::first(distance_microns),
+    
+    # since groups are the same partition, any pair here is both kinds; keep explicit flags anyway
+    MAPseq_pair = TRUE,
+    BARseq_pair = TRUE,
+    
+    # keep traceability to the (shared) group id(s)
+    group_hash = paste(unique(group_hash), collapse = ";"),
+    .groups = "drop"
+  )
+
+print(distance_table)
+write.csv(distance_table, "duplicate_pairs_distance_table_collapsed.csv", row.names = FALSE)
+
+# Sanity table (minimal change; keep group_hash like your original)
+sanity_check <- function(distance_table, df) {
+  check_df <- data.frame()
+  for (i in seq_len(nrow(distance_table))) {
+    cell1 <- distance_table$cell1[i]
+    cell2 <- distance_table$cell2[i]
+    coord1 <- df[cell1, c("CCF_AP", "CCF_DV", "CCF_ML")]
+    coord2 <- df[cell2, c("CCF_AP", "CCF_DV", "CCF_ML")]
+    
+    temp_df <- data.frame(
+      group_hash = distance_table$group_hash[i],
+      cell1 = cell1,
+      AP1 = coord1$CCF_AP, DV1 = coord1$CCF_DV, ML1 = coord1$CCF_ML,
+      cell2 = cell2,
+      AP2 = coord2$CCF_AP, DV2 = coord2$CCF_DV, ML2 = coord2$CCF_ML,
+      distance_voxels  = distance_table$distance_voxels[i],
+      distance_microns = distance_table$distance_microns[i],
+      MAPseq_pair = distance_table$MAPseq_pair[i],
+      BARseq_pair = distance_table$BARseq_pair[i],
+      stringsAsFactors = FALSE
+    )
+    check_df <- rbind(check_df, temp_df)
+  }
+  return(check_df)
+}
+
+sanity_table <- sanity_check(distance_table, df)
+print(sanity_table)
+write.csv(sanity_table, "duplicate_positions_sanity_table.csv", row.names = FALSE)
+
 #####################################################################################################################################################################################
-#####################################################################################################################################################################################
-# Set up filtering to get rid of duplicate cells by checking gene expression and segmentation accuracy
-good_cells <- read.csv("LC_visualQC_barcoded_cells.csv")
-# Keep only columns that contain at least one non-NA value
-good_cells <- good_cells[, colSums(!is.na(good_cells)) > 0]
-good_uids <- good_cells$uid[good_cells$good_barcoded == 1]  # UIDs of good cells
-bad_uids <- good_cells$uid[good_cells$good_barcoded == 0]   # UIDs of badly segmented cells
-# Quick summary
+# QC + transcriptomic metrics for duplicate groups (VBC groups; includes mapped MAPseq hash ID)
+####################################################################################################
+# Load segmentation QC data
+good_cells <- read.csv("LC_visualQC_barcoded_cells.csv", stringsAsFactors = FALSE)
+# Standardize uid column as character (safer joins)
+good_cells$uid <- as.character(good_cells$uid)
+good_uids <- good_cells$uid[good_cells$good_barcoded == 1]
+bad_uids  <- good_cells$uid[good_cells$good_barcoded == 0]
 cat("Total cells in QC file:", nrow(good_cells), "\n")
 cat("Good segmented cells (good_barcoded == 1):", length(good_uids), "\n")
-cat("Badly segmented cells (good_barcoded == 0):", length(bad_uids), "\n")
-head(good_cells)  # Inspect structure
+cat("Bad segmented cells (good_barcoded == 0):", length(bad_uids), "\n")
 
-# Function to extract base UID from df row names (e.g., "11_43_1941753.4" -> "11_43_1941753")
-get_base_uid <- function(cell_id) {
-  sub("\\.[0-9]+$", "", cell_id)
-}
+# Helper: base uid from df rownames (e.g. "11_43_1941753.4" -> "11_43_1941753")
+get_base_uid <- function(cell_id) sub("\\.[0-9]+$", "", cell_id)
 
-# Function to check segmentation quality for a group of cells
-check_segmentation <- function(cells) {
-  results <- data.frame(
-    CellID = cells,
-    Base_UID = sapply(cells, get_base_uid),
-    stringsAsFactors = FALSE
+# Segmentation QC lookup for a vector of cells (rownames(df))
+check_segmentation <- function(cells, qc_df = good_cells) {
+  base_uid <- get_base_uid(cells)
+  
+  # match base_uid -> qc_df
+  m <- match(base_uid, qc_df$uid)
+  
+  status <- ifelse(
+    is.na(m), "Not found in QC list",
+    ifelse(qc_df$good_barcoded[m] == 1, "Good", "Bad (badly segmented)")
   )
   
-  # Check status
-  results$Segmentation_Status <- sapply(results$Base_UID, function(uid) {
-    if (uid %in% good_cells$uid) {
-      if (good_cells$good_barcoded[good_cells$uid == uid] == 1) {
-        "Good"
-      } else {
-        "Bad (badly segmented)"
-      }
-    } else {
-      "Not found in QC list"
-    }
-  })
-  
-  return(results)
+  data.frame(
+    CellID = cells,
+    Base_UID = base_uid,
+    Segmentation_Status = status,
+    stringsAsFactors = FALSE
+  )
 }
 
-# Apply to all duplicate groups and print summaries
-for (hash in names(dup_groups)) {
-  cells <- dup_groups[[hash]]
-  seg_check <- check_segmentation(cells)
-  
-  cat("\nGroup Hash:", hash, "\n")
-  cat("Cells in group:", length(cells), "\n")
-  print(seg_check)  # Shows CellID, Base_UID, Segmentation_QC
-  
-  # Summary for group
-  n_good <- sum(seg_check$Segmentation_QC == "Good")
-  n_bad <- sum(seg_check$Segmentation_QC == "Bad")
-  cat("Good segmented:", n_good, "| Bad segmented:", n_bad, "\n")
-}
-
-# Function to get transcriptomic metrics for a base UID
-get_transcriptomic_metrics <- function(base_uid) {
-  if (base_uid %in% colnames(LCNEneurons)) {
-    expr <- assay(LCNEneurons, "logcounts")[, base_uid]  # Or "counts" if preferred
-    total_umis <- sum(expr)
-    sparsity <- mean(expr == 0)  # Fraction of zero genes
-    return(list(total_umis = round(total_umis, 2), sparsity = round(sparsity, 3)))
-  } else {
-    return(list(total_umis = NA, sparsity = NA))  # If missing (though unlikely now)
+# Transcriptomic metrics
+#    - total_umis: sum of COUNTS
+#    - sparsity: fraction of genes with 0 counts
+get_transcriptomic_metrics <- function(base_uid, sce = LCNEneurons, assay_name = "counts") {
+  if (!base_uid %in% colnames(sce)) {
+    return(list(total_umis = NA_real_, sparsity = NA_real_))
   }
+  
+  x <- assay(sce, assay_name)[, base_uid]
+  
+  # If assay returns sparse matrix column, keep numeric ops safe:
+  x <- as.numeric(x)
+  
+  total_umis <- sum(x, na.rm = TRUE)
+  sparsity   <- mean(x == 0, na.rm = TRUE)
+  
+  list(
+    total_umis = round(total_umis, 2),
+    sparsity   = round(sparsity, 3)
+  )
 }
 
-# Function to check transcriptomic properties for a group of cells
-check_transcriptomics <- function(cells) {
-  results <- data.frame(
+check_transcriptomics <- function(cells, sce = LCNEneurons, assay_name = "counts") {
+  base_uid <- get_base_uid(cells)
+  metrics <- lapply(base_uid, get_transcriptomic_metrics, sce = sce, assay_name = assay_name)
+  
+  data.frame(
     CellID = cells,
-    Base_UID = sapply(cells, get_base_uid),
+    Base_UID = base_uid,
+    Total_UMIs = vapply(metrics, `[[`, numeric(1), "total_umis"),
+    Sparsity   = vapply(metrics, `[[`, numeric(1), "sparsity"),
     stringsAsFactors = FALSE
   )
-  
-  trans_metrics <- lapply(results$Base_UID, get_transcriptomic_metrics)
-  results$Total_UMIs <- sapply(trans_metrics, `[[`, "total_umis")
-  results$Sparsity <- sapply(trans_metrics, `[[`, "sparsity")
-  
-  return(results)
 }
 
-# Initialize a list to collect all combined data
-all_group_data <- list()
-# Apply to all duplicate groups and collect data
-for (hash in names(dup_groups)) {
-  cells <- dup_groups[[hash]]
-  # Segmentation check
-  seg_check <- check_segmentation(cells)
-  # Transcriptomic check
-  trans_check <- check_transcriptomics(cells)
-  # Merge results
-  combined <- merge(seg_check, trans_check, by = c("CellID", "Base_UID"))
-  combined$Group_Hash <- hash  # Add group hash
-  # Collect
-  all_group_data[[hash]] <- combined
-  # Optional: Still print for visibility (or comment out if not needed)
-  cat("\nGroup Hash:", hash, "\n")
-  cat("Cells in group:", length(cells), "\n")
-  print(combined)
-  # Summary
-  n_good <- sum(combined$Segmentation_Status == "Good")
-  n_bad <- sum(grepl("Bad", combined$Segmentation_Status))
-  avg_umis <- mean(combined$Total_UMIs, na.rm = TRUE)
-  avg_sparsity <- mean(combined$Sparsity, na.rm = TRUE)
-  cat("Good segmented:", n_good, "| Bad segmented:", n_bad, "\n")
-  cat("Avg Total UMIs:", round(avg_umis, 2), "| Avg Sparsity:", round(avg_sparsity, 3), "\n")
-}
-# Combine all into one data frame
-full_data <- do.call(rbind, all_group_data)
-# Reorder columns: Group_Hash first, then CellID, etc.
-full_data <- full_data[, c("Group_Hash", "CellID", "Base_UID", "Segmentation_Status", "Total_UMIs", "Sparsity")]
-# Save to CSV
-write.csv(full_data, "duplicate_groups_detailed.csv", row.names = FALSE)
+#  Build one tidy table for ALL duplicate groups
+#    - group ids: both VBC id and mapped MAPseq hash id
+#    - ONE ROW PER CELL within each duplicate group 
+dup_qc_table <- dplyr::bind_rows(lapply(names(dup_vbc_groups), function(vbc_id) {
+  cells <- dup_vbc_groups[[vbc_id]]
+  
+  seg  <- check_segmentation(cells, qc_df = good_cells)
+  tran <- check_transcriptomics(cells, sce = LCNEneurons, assay_name = "counts")
+  
+  out <- dplyr::left_join(seg, tran, by = c("CellID", "Base_UID"))
+  
+  out$VBC_group_id    <- vbc_id
+  out$MAPseq_group_id <- unname(vbc_to_mapseq[[vbc_id]])
+  
+  # match your plotting facet label style (useful for debugging/merging)
+  out$Group_Label <- paste0("VBC_", vbc_id, " | MAPseqHash_", unname(vbc_to_mapseq[[vbc_id]]))
+  
+  # optional: add coords from df (since df rownames are CellID)
+  coords <- df[cells, c("CCF_ML", "CCF_DV", "CCF_AP", "inRH"), drop = FALSE]
+  coords <- tibble::rownames_to_column(as.data.frame(coords), "CellID")
+  
+  out <- dplyr::left_join(out, coords, by = "CellID")
+  
+  out
+}))
+
+print(head(dup_qc_table, 10))
+write.csv(dup_qc_table, "duplicate_groups_detailed.csv", row.names = FALSE)
 
 # Hardcoded manual annotations: Named vectors for CellID -> Doublet_status and Final_selection
 # Based on the updated duplicate_groups_detailed.csv. Keys are CellID.
@@ -665,18 +754,18 @@ manual_doublet_status <- c(
 )
 
 manual_final_selection <- c(
-  "10_40_2680973.4" = "keep",
-  "10_40_2790931.4" = "discard",
-  "9_34_1280890.4" = "discard",
-  "9_34_1390821.4" = "keep",
-  "5_18_831314.4" = "discard",
-  "5_19_1590526.2" = "keep",
-  "5_20_2412260.1" = "discard",
-  "5_20_2420371.1" = "keep",
-  "9_35_2160997.3" = "keep",
-  "9_35_2271333.3" = "discard",
-  "9_34_1280954.2" = "discard",
-  "9_34_1390899.2" = "keep",
+  "10_40_2680973.4" = "discard",
+  "10_40_2790931.4" = "keep",
+  "9_34_1280890.4" = "keep",
+  "9_34_1390821.4" = "discard",
+  "5_18_831314.4" = "keep",
+  "5_19_1590526.2" = "discard",
+  "5_20_2412260.1" = "keep",
+  "5_20_2420371.1" = "discard",
+  "9_35_2160997.3" = "discard",
+  "9_35_2271333.3" = "keep",
+  "9_34_1280954.2" = "keep",
+  "9_34_1390899.2" = "discard",
   "11_41_401501.4" = "discard",
   "11_41_401512.3" = "discard",
   "11_43_1941572.3" = "discard",
@@ -691,50 +780,77 @@ manual_final_selection <- c(
   "9_35_2271284.3" = "keep",
   "5_20_2420651.3" = "keep",
   "5_20_2420670.3" = "discard",
-  "9_35_2161030.2" = "keep",
-  "9_35_2271374.2" = "discard"
+  "9_35_2161030.2" = "discard",
+  "9_35_2271374.2" = "keep"
 )
 
-# Add to full_data using CellID lookup
-full_data$Doublet_status <- manual_doublet_status[full_data$CellID]
-full_data$Doublet_status <- ifelse(is.na(full_data$Doublet_status), "not_reviewed", full_data$Doublet_status)
+# Preconditions
+stopifnot(exists("dup_qc_table"))
+stopifnot("CellID" %in% names(dup_qc_table))
+stopifnot(exists("manual_doublet_status"))
+stopifnot(exists("manual_final_selection"))
 
-full_data$Final_selection <- manual_final_selection[full_data$CellID]
-full_data$Final_selection <- ifelse(is.na(full_data$Final_selection), "keep", full_data$Final_selection)
+# Normalize keys (force character; trim whitespace)
+dup_qc_table <- dup_qc_table %>%
+  mutate(CellID = trimws(as.character(CellID)))
+mds <- as.character(manual_doublet_status)
+names(mds) <- trimws(as.character(names(manual_doublet_status)))
+mfs <- as.character(manual_final_selection)
+names(mfs) <- trimws(as.character(names(manual_final_selection)))
 
-# Validation
-cat("Doublet_status counts:", paste(names(table(full_data$Doublet_status)), table(full_data$Doublet_status), collapse = ", "), "\n")
-cat("Final_selection counts:", paste(names(table(full_data$Final_selection)), table(full_data$Final_selection), collapse = ", "), "\n")
+stopifnot(!is.null(names(mds)), !is.null(names(mfs)))
+stopifnot(!any(is.na(names(mds))), !any(is.na(names(mfs))))
+stopifnot(!any(names(mds) == ""), !any(names(mfs) == ""))
 
-# Generate blacklist from manual selections
-manual_blacklist <- full_data$CellID[full_data$Final_selection == "discard"]
-blacklist_df <- data.frame(row_name = manual_blacklist)
-write.csv(blacklist_df, "duplicate_blacklist_informed_final.csv", row.names = FALSE)
+# Literal overlap sanity check (hard-stop if 0)
+n_overlap_doublet <- sum(dup_qc_table$CellID %in% names(mds))
+n_overlap_final   <- sum(dup_qc_table$CellID %in% names(mfs))
 
-#####################################################################################################################################################################################
-#####################################################################################################################################################################################
-# Estimate how many duplicates can be expected by chance
-simulate_duplicate_probability_sparse <- function(N = 102, K = 20, 
-                                                  p_zero = 0.95, 
-                                                  value_range = 1:10, 
-                                                  n_sim = 100) {
-  dup_counts <- numeric(n_sim)
-  for (i in seq_len(n_sim)) {
-    mat <- matrix(
-      ifelse(runif(N * K) < p_zero, 0, sample(value_range, N * K, replace = TRUE)),
-      nrow = N, ncol = K
-    )
-    profiles <- apply(mat, 1, paste, collapse = "_")
-    dup_counts[i] <- sum(duplicated(profiles))
-  }
-  mean(dup_counts)
+cat("Overlap (Doublet_status):", n_overlap_doublet, "of", nrow(dup_qc_table), "\n")
+cat("Overlap (Final_selection):", n_overlap_final,   "of", nrow(dup_qc_table), "\n")
+
+if (n_overlap_doublet == 0 || n_overlap_final == 0) {
+  stop(
+    "0 overlap detected. Example dup_qc_table CellIDs: ",
+    paste(head(dup_qc_table$CellID, 10), collapse = ", "),
+    " | Example manual keys: ",
+    paste(head(names(mds), 10), collapse = ", ")
+  )
 }
 
-# Example usage for ctx subset:
-set.seed(42)
-simulate_duplicate_probability_sparse(N = 102, K = 20, p_zero = 0.95, value_range = 1:10, n_sim = 100)
+# Attach annotations (match-safe; avoids factor indexing pitfalls)
+dup_qc_table$Doublet_status  <- unname(mds[dup_qc_table$CellID])
+dup_qc_table$Final_selection <- unname(mfs[dup_qc_table$CellID])
 
-simulate_duplicate_probability_sparse(N = 102, K = 120, p_zero = 0.95, value_range = 1:10, n_sim = 100)
+dup_qc_table$Doublet_status[is.na(dup_qc_table$Doublet_status)  | dup_qc_table$Doublet_status  == ""] <- "not_reviewed"
+dup_qc_table$Final_selection[is.na(dup_qc_table$Final_selection) | dup_qc_table$Final_selection == ""] <- "not_reviewed"
+
+# Validate / summarize
+cat("\nDoublet_status counts:\n")
+print(table(dup_qc_table$Doublet_status, useNA = "ifany"))
+cat("\nFinal_selection counts:\n")
+print(table(dup_qc_table$Final_selection, useNA = "ifany"))
+
+missing_doublet <- dup_qc_table %>% filter(Doublet_status == "not_reviewed") %>% pull(CellID)
+missing_final   <- dup_qc_table %>% filter(Final_selection == "not_reviewed") %>% pull(CellID)
+cat("\nCells missing Doublet_status:", length(missing_doublet), "\n")
+if (length(missing_doublet)) print(missing_doublet)
+cat("\nCells missing Final_selection:", length(missing_final), "\n")
+if (length(missing_final)) print(missing_final)
+
+extra_doublet <- setdiff(names(mds), unique(dup_qc_table$CellID))
+extra_final   <- setdiff(names(mfs), unique(dup_qc_table$CellID))
+cat("\nManual Doublet_status entries not in dup_qc_table:", length(extra_doublet), "\n")
+if (length(extra_doublet)) print(extra_doublet)
+cat("\nManual Final_selection entries not in dup_qc_table:", length(extra_final), "\n")
+if (length(extra_final)) print(extra_final)
+
+write.csv(dup_qc_table, "dup_qc_table_with_manual_annotations.csv", row.names = FALSE)
+
+# Generate blacklist from manual selections
+manual_blacklist <- dup_qc_table$CellID[dup_qc_table$Final_selection == "discard"]
+blacklist_df <- data.frame(row_name = manual_blacklist)
+write.csv(blacklist_df, "duplicate_blacklist_informed_final.csv", row.names = FALSE)
 
 #####################################################################################################################################################################################
 #combine RH and LH matrices
@@ -964,7 +1080,7 @@ ggsave("RHsoma_rawcount_LH-RHprojections_side_by_side.pdf", plot = p_RH, device 
 
 ########################################################### plot histograms with highest projection density regions for raw and log norm ##########################################################
 # Drop unwanted columns
-drop_cols <- c("slice", "barcode", "CCF_AP", "CCF_DV", "CCF_ML", "inRH")
+drop_cols <- c("slice", "CCF_AP", "CCF_DV", "CCF_ML", "inRH")
 df_clean <- df[ , !(names(df) %in% drop_cols)]
 # Convert all columns to numeric
 df_numeric <- as.data.frame(lapply(df_clean, as.numeric))

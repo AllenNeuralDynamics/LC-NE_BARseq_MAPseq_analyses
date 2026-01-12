@@ -1,146 +1,157 @@
-# Load functions which handle pre-processing or organizing of the data
-source("~/capsule/code/01_loaders_brain3-4_combined.R")
-
-brain3 <- load_data_brain3()
-names(brain3)
-# Extract components
-brain3_raw_proj_matrix <- as.data.frame(brain3$proj_matrix_raw)
-# Preserve original rownames
-rownames(brain3_raw_proj_matrix) <- rownames(brain3$proj_matrix_raw)
-brain3_inRH_lookup <- brain3$inRH_lookup
-brain3_metadata <- brain3$metadata
-
-brain4 <- load_data_brain4()
-names(brain4)
-# Extract components
-brain4_raw_proj_matrix <- as.data.frame(brain4$proj_matrix_raw)
-# Preserve original rownames
-rownames(brain4_raw_proj_matrix) <- rownames(brain4$proj_matrix_raw)
-brain4_inRH_lookup <- brain4$inRH_lookup
-brain4_metadata <- brain4$metadata
-
-#set working directory to save things to
-setwd('/scratch/BARseq_780345-780346_combined/')
-
-# Ensure ROI compatibility between brain3 and brain4 ROIs 
-colnames(brain3_raw_proj_matrix)
-colnames(brain4_raw_proj_matrix)
-# Correct Amyg-GPe spelling
-colnames(brain4_raw_proj_matrix) <- stringr::str_replace_all(colnames(brain4_raw_proj_matrix), "amyg-Gpe", "amyg-GPe")
-# Sum cerebellum sections into one sample
-groups <- c("RH.12", "LH.12")
-for (group in groups) {
-  i_col <- paste0("cerebellum I_", group)
-  ii_col <- paste0("cerebellum II_", group)
-  new_col <- paste0("cerebellum_", group)
-  if (i_col %in% colnames(brain4_raw_proj_matrix) && ii_col %in% colnames(brain4_raw_proj_matrix)) {
-    # Sum the projections
-    brain4_raw_proj_matrix[, new_col] <- brain4_raw_proj_matrix[, i_col] + brain4_raw_proj_matrix[, ii_col]
-    # Remove the original I and II columns
-    brain4_raw_proj_matrix <- brain4_raw_proj_matrix[, !(colnames(brain4_raw_proj_matrix) %in% c(i_col, ii_col))]
-    cat("Summed", i_col, "+", ii_col, "into", new_col, "\n")
-  } else {
-    cat("Warning: Columns for", group, "not found\n")
-  }
-}
-
-# Sum columns with corresponding base ROI names to enhance dataset compatibility - brain3
-dim(brain3_raw_proj_matrix)
-head(brain3_raw_proj_matrix)
-brain3_result <- sum_by_base_roi(brain3_raw_proj_matrix)
-brain3_summed <- brain3_result$summed_matrix
-dim(brain3_summed)
-head(brain3_summed)
-brain3_mapping <- brain3_result$mapping
-cat("Brain3 mapping (what was combined into each base ROI):\n")
-for (base in names(brain3_mapping)) {
-  cat(base, ":", paste(brain3_mapping[[base]], collapse = ", "), "\n")
-}
-
-# Sum columns with corresponding base ROI names to enhance dataset compatibility - brain4
-dim(brain4_raw_proj_matrix)
-head(brain4_raw_proj_matrix)
-brain4_result <- sum_by_base_roi(brain4_raw_proj_matrix)
-brain4_summed <- brain4_result$summed_matrix
-dim(brain4_summed)
-head(brain4_summed)
-brain4_mapping <- brain4_result$mapping
-cat("\nBrain4 mapping:\n")
-for (base in names(brain4_mapping)) {
-  cat(base, ":", paste(brain4_mapping[[base]], collapse = ", "), "\n")
-}
-
-# Apply ipsi-contra to brain3 summed matrix
-ipsi_contra_brain3 <- create_ipsi_contra_from_matrix(brain3_summed, brain3_inRH_lookup, "brain3 summed")
-head(ipsi_contra_brain3)
-
-# Apply ipsi-contra to brain4 summed matrix
-ipsi_contra_brain4 <- create_ipsi_contra_from_matrix(brain4_summed, brain4_inRH_lookup, "brain4 summed")
-head(ipsi_contra_brain4)
-
-# Get column names from the ipsi-contra matrices
-brain3_cols <- colnames(ipsi_contra_brain3)
-brain4_cols <- colnames(ipsi_contra_brain4)
-# Find shared regions (exact matches)
-shared_regions <- intersect(brain3_cols, brain4_cols)
-# Find unique regions
-unique_brain3 <- setdiff(brain3_cols, brain4_cols)
-unique_brain4 <- setdiff(brain4_cols, brain3_cols)
-# Print results
-cat("Shared regions (", length(shared_regions), "):\n")
-if (length(shared_regions) > 0) {
-  cat(paste(sort(shared_regions), collapse = ", "), "\n\n")
-}
-cat("Unique to brain3 (", length(unique_brain3), "):\n")
-if (length(unique_brain3) > 0) {
-  cat(paste(sort(unique_brain3), collapse = ", "), "\n\n")
-}
-cat("Unique to brain4 (", length(unique_brain4), "):\n")
-if (length(unique_brain4) > 0) {
-  cat(paste(sort(unique_brain4), collapse = ", "), "\n\n")
-}
-
-# Subset to shared regions
-brain3_shared <- ipsi_contra_brain3[, shared_regions, drop = FALSE]
-head(brain3_shared)
-brain4_shared <- ipsi_contra_brain4[, shared_regions, drop = FALSE]
-head(brain4_shared)
-
-# Normalize each subset
-brain3_shared_norm <- normalize_projection_matrix(brain3_shared, "brain3 shared ipsi-contra")
-head(brain3_shared_norm)
-brain4_shared_norm <- normalize_projection_matrix(brain4_shared, "brain4 shared ipsi-contra")
-head(brain4_shared_norm)
-
-# Combine the normalized subsets
-combined_norm <- as.data.frame(rbind(brain3_shared_norm, brain4_shared_norm))
-head(combined_norm)
-cat("Combined normalized matrix dimensions:", dim(combined_norm), "\n")
-
-# Preserve rownames before conversion
-original_rownames <- rownames(combined_norm)
-# Convert to numeric matrix
-combined_norm <- as.matrix(combined_norm)
-combined_norm <- apply(combined_norm, 2, as.numeric)  # Ensure numeric
-combined_norm <- as.matrix(combined_norm)
-# Reassign rownames
-rownames(combined_norm) <- original_rownames
-head(combined_norm) 
-
-# Combine metadata from brain3 and brain4
-combined_metadata <- rbind(brain3_metadata, brain4_metadata)
+# # Load functions which handle pre-processing or organizing of the data
+# source("~/capsule/code/01_loaders_brain3-4_combined.R")
+# 
+# brain3 <- load_data_brain3()
+# names(brain3)
+# # Extract components
+# brain3_raw_proj_matrix <- as.data.frame(brain3$proj_matrix_raw)
+# # Preserve original rownames
+# rownames(brain3_raw_proj_matrix) <- rownames(brain3$proj_matrix_raw)
+# brain3_inRH_lookup <- brain3$inRH_lookup
+# brain3_metadata <- brain3$metadata
+# 
+# brain4 <- load_data_brain4()
+# names(brain4)
+# # Extract components
+# brain4_raw_proj_matrix <- as.data.frame(brain4$proj_matrix_raw)
+# # Preserve original rownames
+# rownames(brain4_raw_proj_matrix) <- rownames(brain4$proj_matrix_raw)
+# brain4_inRH_lookup <- brain4$inRH_lookup
+# brain4_metadata <- brain4$metadata
+# 
+# #set working directory to save things to
+# setwd('/scratch/BARseq_780345-780346_combined/')
+# 
+# # Ensure ROI compatibility between brain3 and brain4 ROIs 
+# colnames(brain3_raw_proj_matrix)
+# colnames(brain4_raw_proj_matrix)
+# # Correct Amyg-GPe spelling
+# colnames(brain4_raw_proj_matrix) <- stringr::str_replace_all(colnames(brain4_raw_proj_matrix), "amyg-Gpe", "amyg-GPe")
+# # Sum cerebellum sections into one sample
+# groups <- c("RH.12", "LH.12")
+# for (group in groups) {
+#   i_col <- paste0("cerebellum I_", group)
+#   ii_col <- paste0("cerebellum II_", group)
+#   new_col <- paste0("cerebellum_", group)
+#   if (i_col %in% colnames(brain4_raw_proj_matrix) && ii_col %in% colnames(brain4_raw_proj_matrix)) {
+#     # Sum the projections
+#     brain4_raw_proj_matrix[, new_col] <- brain4_raw_proj_matrix[, i_col] + brain4_raw_proj_matrix[, ii_col]
+#     # Remove the original I and II columns
+#     brain4_raw_proj_matrix <- brain4_raw_proj_matrix[, !(colnames(brain4_raw_proj_matrix) %in% c(i_col, ii_col))]
+#     cat("Summed", i_col, "+", ii_col, "into", new_col, "\n")
+#   } else {
+#     cat("Warning: Columns for", group, "not found\n")
+#   }
+# }
+# 
+# # Sum columns with corresponding base ROI names to enhance dataset compatibility - brain3
+# dim(brain3_raw_proj_matrix)
+# head(brain3_raw_proj_matrix)
+# brain3_result <- sum_by_base_roi(brain3_raw_proj_matrix)
+# brain3_summed <- brain3_result$summed_matrix
+# dim(brain3_summed)
+# head(brain3_summed)
+# brain3_mapping <- brain3_result$mapping
+# cat("Brain3 mapping (what was combined into each base ROI):\n")
+# for (base in names(brain3_mapping)) {
+#   cat(base, ":", paste(brain3_mapping[[base]], collapse = ", "), "\n")
+# }
+# 
+# # Sum columns with corresponding base ROI names to enhance dataset compatibility - brain4
+# dim(brain4_raw_proj_matrix)
+# head(brain4_raw_proj_matrix)
+# brain4_result <- sum_by_base_roi(brain4_raw_proj_matrix)
+# brain4_summed <- brain4_result$summed_matrix
+# dim(brain4_summed)
+# head(brain4_summed)
+# brain4_mapping <- brain4_result$mapping
+# cat("\nBrain4 mapping:\n")
+# for (base in names(brain4_mapping)) {
+#   cat(base, ":", paste(brain4_mapping[[base]], collapse = ", "), "\n")
+# }
+# 
+# # Apply ipsi-contra to brain3 summed matrix
+# ipsi_contra_brain3 <- create_ipsi_contra_from_matrix(brain3_summed, brain3_inRH_lookup, "brain3 summed")
+# head(ipsi_contra_brain3)
+# 
+# # Apply ipsi-contra to brain4 summed matrix
+# ipsi_contra_brain4 <- create_ipsi_contra_from_matrix(brain4_summed, brain4_inRH_lookup, "brain4 summed")
+# head(ipsi_contra_brain4)
+# 
+# # Get column names from the ipsi-contra matrices
+# brain3_cols <- colnames(ipsi_contra_brain3)
+# brain4_cols <- colnames(ipsi_contra_brain4)
+# # Find shared regions (exact matches)
+# shared_regions <- intersect(brain3_cols, brain4_cols)
+# # Find unique regions
+# unique_brain3 <- setdiff(brain3_cols, brain4_cols)
+# unique_brain4 <- setdiff(brain4_cols, brain3_cols)
+# # Print results
+# cat("Shared regions (", length(shared_regions), "):\n")
+# if (length(shared_regions) > 0) {
+#   cat(paste(sort(shared_regions), collapse = ", "), "\n\n")
+# }
+# cat("Unique to brain3 (", length(unique_brain3), "):\n")
+# if (length(unique_brain3) > 0) {
+#   cat(paste(sort(unique_brain3), collapse = ", "), "\n\n")
+# }
+# cat("Unique to brain4 (", length(unique_brain4), "):\n")
+# if (length(unique_brain4) > 0) {
+#   cat(paste(sort(unique_brain4), collapse = ", "), "\n\n")
+# }
+# 
+# # Subset to shared regions
+# brain3_shared <- ipsi_contra_brain3[, shared_regions, drop = FALSE]
+# head(brain3_shared)
+# brain4_shared <- ipsi_contra_brain4[, shared_regions, drop = FALSE]
+# head(brain4_shared)
+# 
+# # Normalize each subset
+# brain3_shared_norm <- normalize_projection_matrix(brain3_shared, "brain3 shared ipsi-contra")
+# head(brain3_shared_norm)
+# brain4_shared_norm <- normalize_projection_matrix(brain4_shared, "brain4 shared ipsi-contra")
+# head(brain4_shared_norm)
+# 
+# # Combine the normalized subsets
+# combined_norm <- as.data.frame(rbind(brain3_shared_norm, brain4_shared_norm))
+# head(combined_norm)
+# cat("Combined normalized matrix dimensions:", dim(combined_norm), "\n")
+# 
+# # Preserve rownames before conversion
+# original_rownames <- rownames(combined_norm)
+# # Convert to numeric matrix
+# combined_norm <- as.matrix(combined_norm)
+# combined_norm <- apply(combined_norm, 2, as.numeric)  # Ensure numeric
+# combined_norm <- as.matrix(combined_norm)
+# # Reassign rownames
+# rownames(combined_norm) <- original_rownames
+# head(combined_norm) 
+# 
+# # Combine metadata from brain3 and brain4
+# combined_metadata <- rbind(brain3_metadata, brain4_metadata)
 ##########################################################################################################################################
+source("~/capsule/code/02_prepare_brain3_4_combined_inputs.R")
+
+OUT_DIR <- "/scratch/BARseq_780345-780346_combined/"
+
+prep <- prepare_brain3_4_inputs(
+  loaders_path = "~/capsule/code/01_loaders_brain3-4_combined.R",
+  out_dir = OUT_DIR,
+  verbose = TRUE,
+  return_intermediates = TRUE,
+  restore_wd = FALSE
+)
+
+setwd(OUT_DIR)  # explicit, guarantees downstream saves go here
+
+combined_norm <- prep$combined_norm
+combined_metadata <- prep$combined_metadata     
+combined_inRH_lookup <- prep$combined_inRH_lookup
+
 combined_norm_df <- as.data.frame(combined_norm)
 
-# Combine inRH_lookup from both brains
-combined_inRH <- rbind(brain3_inRH_lookup, brain4_inRH_lookup)
-# Ensure combined_inRH is ordered to match the rownames of combined_norm_df
-combined_inRH <- combined_inRH[match(rownames(combined_norm_df), combined_inRH$row_id), ]
-# Sanity check: Ensure rownames of combined_norm match row_id in combined_inRH
-stopifnot(all(rownames(combined_norm_df) == combined_inRH$row_id))
-
 # Create a custom color palette for the inRH column (red for RH, blue for LH)
-inRH_colors <- ifelse(combined_inRH$inRH == 1, "red", "blue")
+inRH_colors <- ifelse(combined_inRH_lookup$inRH == 1, "red", "blue")
 
 # Plot the combined heatmap (similar to the old sanity check)
 numeric_matrix <- data.matrix(combined_norm_df)
@@ -190,7 +201,7 @@ heatmap_matrix <- apply(heatmap_matrix, 2, as.numeric)
 rownames(heatmap_matrix) <- rownames(combined_norm_sorted)
 n_cells <- nrow(heatmap_matrix)
 main_title <- paste0(
-  "Combined Cell-by-Region Projections (Brain3 + Brain4)\n(Cells Sorted by Top Projection)\n",
+  "Combined Cell-by-Region Projections\n(Cells Sorted by Top Projection)\n",
   "n = ", n_cells, " cells"
 )
 heatmap.2(
@@ -233,7 +244,7 @@ heatmap_matrix_ipsi <- apply(heatmap_matrix_ipsi, 2, as.numeric)
 rownames(heatmap_matrix_ipsi) <- rownames(ipsi_matrix_sorted)
 n_cells <- nrow(heatmap_matrix_ipsi)
 main_title <- paste0(
-  "Combined Cell-by-Region Projections (Brain3 + Brain4)\n(Cells Sorted by Top Ipsi Projection)\n",
+  "Combined Cell-by-Region Projections\n(Cells Sorted by Top Ipsi Projection)\n",
   "n = ", n_cells, " cells"
 )
 heatmap.2(
@@ -270,11 +281,31 @@ num_cells_per_region <- colSums(source_matrix > 0)
 # This shows which regions receive projections from the largest number of cells
 par(mar = c(14, 4, 4, 2)) 
 barplot(num_cells_per_region, las = 2, col = "lightblue", 
-        xlab = "", ylab = "Number of cells", main = "Number of Cells per Aggregated Region (Combined Brains 3 & 4)")
+        xlab = "", ylab = "Number of cells", main = "Number of Cells per Aggregated Region")
 mtext("Aggregated Region", side = 1, line = 12) 
 par(mar = c(5, 4, 4, 2))  
 dev.copy(pdf, "Combined_absolute_number_of_cells_with_non-zero_projections_to_aggregated_ROI.pdf", width = 8, height = 6)
 dev.off()
+
+# Region level stats for results section
+region_min   <- min(num_cells_per_region)
+region_max   <- max(num_cells_per_region)
+region_median<- median(num_cells_per_region)
+
+c(region_min = region_min, region_max = region_max, region_median = region_median)
+
+# Cell levels stas for results section
+cell_median <- median(num_regions_per_cell)
+cell_iqr    <- quantile(num_regions_per_cell, probs = c(0.25, 0.75), names = FALSE)
+cell_range  <- range(num_regions_per_cell)
+
+list(
+  median = cell_median,
+  IQR_25 = cell_iqr[1],
+  IQR_75 = cell_iqr[2],
+  min = cell_range[1],
+  max = cell_range[2]
+)
 
 ###################################################### Co-innervation matrix (Jaccard index) → overlap among cells that hit at least one of the pair ######################################################
 # Ignore projection strength and work with binary presence/absence:
@@ -304,7 +335,7 @@ heatmap.2(
   trace = "none",
   dendrogram = "none",
   scale = "none",
-  main = "Normalized Co-Innervation Fraction (Jaccard)",
+  main = "Normalized Co-Innervation Fraction",
   margins = c(10, 10),
   cexRow = 0.7,
   cexCol = 0.7,
@@ -321,6 +352,224 @@ heatmap.2(
 )
 dev.copy(pdf, "Combined_co-innervation_fraction.pdf", width = 12, height = 10)
 dev.off()
+
+# Statistical summaries for the methods section
+## Basic counts
+n_cells   <- nrow(source_matrix)
+n_targets <- ncol(source_matrix)
+
+## How many cells target each target (binary presence/absence)
+cells_per_target <- colSums(source_matrix > 0)
+
+## How many targets each cell hits (binary)
+targets_per_cell <- rowSums(source_matrix > 0)
+n_multi_proj     <- sum(targets_per_cell > 1)
+frac_multi_proj  <- n_multi_proj / n_cells
+
+## Quick summaries 
+list(
+  n_cells = n_cells,
+  n_targets = n_targets,
+  n_multi_proj = n_multi_proj,
+  frac_multi_proj = frac_multi_proj,
+  cells_per_target_summary = summary(cells_per_target),
+  targets_per_cell_summary = summary(targets_per_cell)
+)
+
+get_top_jaccard_pairs <- function(source_matrix, co_innervation_matrix, top_n = 20) {
+  stopifnot(identical(colnames(source_matrix), colnames(co_innervation_matrix)))
+  m <- co_innervation_matrix
+  diag(m) <- NA
+  
+  ut <- which(upper.tri(m) & !is.na(m), arr.ind = TRUE)
+  vals <- m[ut]
+  ord <- order(vals, decreasing = TRUE)
+  ut <- ut[ord, , drop = FALSE]
+  vals <- vals[ord]
+  
+  top <- head(seq_along(vals), top_n)
+  
+  out <- lapply(top, function(k) {
+    i <- ut[k, 1]; j <- ut[k, 2]
+    ti <- colnames(m)[i]; tj <- colnames(m)[j]
+    a <- source_matrix[, i] > 0
+    b <- source_matrix[, j] > 0
+    inter <- sum(a & b)
+    uni   <- sum(a | b)
+    data.frame(
+      target_i = ti,
+      target_j = tj,
+      jaccard  = vals[k],
+      n_intersection = inter,
+      n_union        = uni,
+      n_i = sum(a),
+      n_j = sum(b)
+    )
+  })
+  
+  do.call(rbind, out)
+}
+
+top_pairs <- get_top_jaccard_pairs(source_matrix, co_innervation_matrix, top_n = 20)
+top_pairs
+write.csv(top_pairs, "top_jaccard_pairs_with_counts.csv", row.names = FALSE)
+
+# Off-diagonal distribution summary
+m <- co_innervation_matrix
+diag(m) <- NA
+offdiag <- m[upper.tri(m)]
+offdiag <- offdiag[!is.na(offdiag) & is.finite(offdiag)]
+
+offdiag_summary <- list(
+  n_targets = ncol(source_matrix),
+  n_pairs = length(offdiag),
+  summary = summary(offdiag), # Min/1Q/Median/Mean/3Q/Max
+  quantiles = quantile(offdiag, c(.05,.1,.25,.5,.75,.9,.95), na.rm=TRUE),
+  frac_ge_05 = mean(offdiag >= 0.5),
+  frac_ge_07 = mean(offdiag >= 0.7),
+  frac_ge_08 = mean(offdiag >= 0.8)
+)
+offdiag_summary
+
+# Blockwise summaries (supports “ipsi–ipsi blocks” etc.)
+# Blockwise summaries (ipsi/contra only; excludes "other" targets such as SP)
+type <- ifelse(grepl("-ipsi$", colnames(source_matrix)), "ipsi",
+               ifelse(grepl("-contra$", colnames(source_matrix)), "contra", "other"))
+
+# Keep only ipsi/contra targets for hemisphere-class summaries
+keep <- type %in% c("ipsi","contra")
+m2 <- m[keep, keep, drop = FALSE]
+type2 <- type[keep]
+
+# Helper that always returns UNIQUE pairs (upper triangle), for all block types
+get_block_vals_ut <- function(m2, type2, block = c("ipsi-ipsi","contra-contra","ipsi-contra")) {
+  block <- match.arg(block)
+  ut <- upper.tri(m2) & is.finite(m2) & !is.na(m2)
+  
+  if (block == "ipsi-ipsi") {
+    sel <- outer(type2=="ipsi", type2=="ipsi", "&")
+  } else if (block == "contra-contra") {
+    sel <- outer(type2=="contra", type2=="contra", "&")
+  } else { # ipsi-contra
+    sel <- outer(type2=="ipsi", type2=="contra", "&") | outer(type2=="contra", type2=="ipsi", "&")
+  }
+  
+  v <- m2[ut & sel]
+  v[is.finite(v) & !is.na(v)]
+}
+
+vals_ipsi_ipsi     <- get_block_vals_ut(m2, type2, "ipsi-ipsi")
+vals_contra_contra <- get_block_vals_ut(m2, type2, "contra-contra")
+vals_ipsi_contra   <- get_block_vals_ut(m2, type2, "ipsi-contra")
+
+# Quick sanity checks: unique pair counts
+c(
+  n_ipsi_ipsi = length(vals_ipsi_ipsi),
+  n_ipsi_contra = length(vals_ipsi_contra),
+  n_contra_contra = length(vals_contra_contra),
+  n_total_pairs = length(vals_ipsi_ipsi) + length(vals_ipsi_contra) + length(vals_contra_contra)
+)
+
+block_df <- rbind(
+  data.frame(block="ipsi-ipsi", t(summary(vals_ipsi_ipsi))),
+  data.frame(block="contra-contra", t(summary(vals_contra_contra))),
+  data.frame(block="ipsi-contra", t(summary(vals_ipsi_contra)))
+)
+block_df
+
+#Report top pairs in a results-friendly way (you already have these, but here’s a formatting helper)
+format_top_pairs <- function(top_pairs, n = 5, digits = 3) {
+  tp <- head(top_pairs, n)
+  apply(tp, 1, function(r) {
+    sprintf("%s–%s (J=%.3f; shared %s/%s; n_i=%s, n_j=%s)",
+            r["target_i"], r["target_j"],
+            as.numeric(r["jaccard"]),
+            r["n_intersection"], r["n_union"],
+            r["n_i"], r["n_j"])
+  })
+}
+format_top_pairs(top_pairs, n = 6)
+
+hist(offdiag, breaks=50)
+c(median=median(offdiag), mean=mean(offdiag), p90=quantile(offdiag,0.9), p10=quantile(offdiag,0.1))
+
+#Exact IQR and range (if you want them explicitly in text)
+offdiag_iqr <- quantile(offdiag, c(0.25, 0.75), na.rm=TRUE)
+offdiag_range <- range(offdiag, na.rm=TRUE)
+offdiag_iqr
+offdiag_range
+
+#Add “how many pairs” exceed thresholds (counts, not just fractions)
+c(
+  n_pairs = length(offdiag),
+  n_ge_05 = sum(offdiag >= 0.5),
+  n_ge_07 = sum(offdiag >= 0.7),
+  n_ge_08 = sum(offdiag >= 0.8)
+)
+
+#If you want to report blockwise counts (how many values in each block)
+c(
+  n_ipsi_ipsi = length(vals_ipsi_ipsi),
+  n_ipsi_contra = length(vals_ipsi_contra),
+  n_contra_contra = length(vals_contra_contra)
+)
+
+#If you want to cite blockwise 90th percentiles (often nice for “upper tail” comparisons)
+c(
+  ipsi_ipsi_p90 = unname(quantile(vals_ipsi_ipsi, 0.90)),
+  ipsi_contra_p90 = unname(quantile(vals_ipsi_contra, 0.90)),
+  contra_contra_p90 = unname(quantile(vals_contra_contra, 0.90))
+)
+
+#Optional null model scaffold (only if you want inferential language later)
+#This preserves per-cell projection breadth (row sums) while breaking target identity; you can compare observed off-diagonal median or the fraction ≥0.7 to the null distribution.
+set.seed(1)
+df_bin <- (source_matrix > 0) * 1
+
+permute_within_rows <- function(mat_bin) {
+  t(apply(mat_bin, 1, sample))
+}
+
+compute_offdiag_jaccard <- function(mat_bin) {
+  p <- ncol(mat_bin)
+  m <- matrix(0, p, p)
+  for(i in 1:p) for(j in 1:p) {
+    a <- mat_bin[, i] == 1
+    b <- mat_bin[, j] == 1
+    u <- sum(a | b)
+    m[i,j] <- ifelse(u==0, NA, sum(a & b)/u)
+  }
+  diag(m) <- NA
+  v <- m[upper.tri(m)]
+  v[!is.na(v)]
+}
+
+obs_offdiag <- compute_offdiag_jaccard(df_bin)
+null_stats <- replicate(200, {
+  perm <- permute_within_rows(df_bin)
+  v <- compute_offdiag_jaccard(perm)
+  c(median=median(v), frac_ge_07=mean(v>=0.7))
+})
+apply(null_stats, 1, quantile, c(.05,.5,.95))
+
+null_df <- as.data.frame(t(null_stats))
+head(null_df)
+summary(null_df)
+
+# Observed values
+obs_median     <- median(obs_offdiag, na.rm = TRUE)
+obs_frac_ge_07 <- mean(obs_offdiag >= 0.7, na.rm = TRUE)
+
+# Null quantiles (e.g., 5/50/95%)
+null_median_q <- quantile(null_stats["median", ], c(0.05, 0.5, 0.95), na.rm = TRUE)
+null_frac07_q <- quantile(null_stats["frac_ge_07", ], c(0.05, 0.5, 0.95), na.rm = TRUE)
+
+list(
+  observed = c(median = obs_median, frac_ge_07 = obs_frac_ge_07),
+  null_median_quantiles = null_median_q,
+  null_frac_ge_07_quantiles = null_frac07_q
+)
+
 
 ###################################################### Projection fraction per region  ######################################################
 # Restrict to multi-projecting cells: cells that project to >1 grouped region.
@@ -429,6 +678,184 @@ heatmap.2(
 )
 dev.copy(pdf, "Combined_conditional_probability_between_aggregated_regions.pdf", width = 12, height = 10)
 dev.off()
+
+##############################################
+# Stats calculations for conditional probabilities (RESULTS)
+# Uses directed A→B pairs (A ≠ B), plus support-filtered top pairs,
+# per-target summaries, and lift (base-rate corrected enrichment).
+##############################################
+
+# --- Global summaries of conditional probabilities (ALL off-diagonal, directed) ---
+P <- prob_other_given_here
+stopifnot(is.matrix(P))
+stopifnot(identical(rownames(P), colnames(P)))
+
+diag(P) <- NA
+
+# Vectorize ALL A→B entries excluding diagonal
+p_off <- as.vector(P)
+p_off <- p_off[!is.na(p_off) & is.finite(p_off)]
+
+# Sanity check: with 45 targets, should be 45*44 = 1980 directed pairs
+stopifnot(length(p_off) == ncol(P) * (ncol(P) - 1))
+
+condprob_summary <- list(
+  n_targets = ncol(P),
+  n_pairs   = length(p_off),
+  summary   = summary(p_off),  # Min/1Q/Median/Mean/3Q/Max
+  quantiles = quantile(p_off, c(.05,.10,.25,.50,.75,.90,.95), na.rm=TRUE),
+  range     = range(p_off, na.rm=TRUE),
+  n_ge_05   = sum(p_off >= 0.5, na.rm=TRUE),
+  n_ge_07   = sum(p_off >= 0.7, na.rm=TRUE),
+  n_ge_08   = sum(p_off >= 0.8, na.rm=TRUE),
+  frac_ge_05 = mean(p_off >= 0.5, na.rm=TRUE),
+  frac_ge_07 = mean(p_off >= 0.7, na.rm=TRUE),
+  frac_ge_08 = mean(p_off >= 0.8, na.rm=TRUE)
+)
+condprob_summary
+
+
+# --- Top directional conditional-probability pairs with support ---
+get_top_conditional_pairs <- function(df_bin, P, top_n = 20,
+                                      min_nA = 30, min_nAB = 20) {
+  stopifnot(identical(colnames(df_bin), colnames(P)))
+  stopifnot(identical(rownames(P), colnames(P)))
+  
+  # counts
+  nA  <- colSums(df_bin)          # #cells with A
+  nAB <- t(df_bin) %*% df_bin     # joint counts (#cells with A and B)
+  
+  M <- P
+  diag(M) <- NA
+  ij <- which(!is.na(M) & is.finite(M), arr.ind = TRUE)
+  
+  out <- data.frame(
+    A = rownames(M)[ij[,1]],
+    B = colnames(M)[ij[,2]],
+    P_B_given_A = M[ij],
+    n_A  = nA[rownames(M)[ij[,1]]],
+    n_B  = nA[colnames(M)[ij[,2]]],
+    n_AB = as.integer(nAB[cbind(ij[,1], ij[,2])]),
+    stringsAsFactors = FALSE
+  )
+  
+  # support filters
+  out <- out[out$n_A >= min_nA & out$n_AB >= min_nAB, , drop = FALSE]
+  out <- out[order(out$P_B_given_A, decreasing = TRUE), , drop = FALSE]
+  head(out, top_n)
+}
+
+top_cond_pairs <- get_top_conditional_pairs(df_bin, P,
+                                            top_n = 25, min_nA = 30, min_nAB = 20)
+top_cond_pairs
+
+format_top_cond_pairs <- function(df, n = 8, digits = 3) {
+  df <- head(df, n)
+  apply(df, 1, function(r) {
+    sprintf("%s→%s: P=%.3f (n_A=%s, n_AB=%s; n_B=%s)",
+            r["A"], r["B"], as.numeric(r["P_B_given_A"]),
+            r["n_A"], r["n_AB"], r["n_B"])
+  })
+}
+format_top_cond_pairs(top_cond_pairs, n = 10)
+
+
+# --- For each A, list its top-K partners B by P(B|A) ---
+top_partners_by_A <- function(P, df_bin, k = 5, min_nA = 30) {
+  nA  <- colSums(df_bin)
+  nAB <- t(df_bin) %*% df_bin
+  
+  res <- lapply(rownames(P), function(A) {
+    if (nA[A] < min_nA) return(NULL)
+    v <- P[A, ]
+    v[A] <- NA
+    ok <- which(!is.na(v) & is.finite(v))
+    if (!length(ok)) return(NULL)
+    ord <- ok[order(v[ok], decreasing = TRUE)]
+    ord <- head(ord, k)
+    data.frame(
+      A = A,
+      n_A = nA[A],
+      B = colnames(P)[ord],
+      P_B_given_A = v[ord],
+      n_AB = as.integer(nAB[A, colnames(P)[ord]]),
+      stringsAsFactors = FALSE
+    )
+  })
+  do.call(rbind, res)
+}
+
+top_by_A <- top_partners_by_A(P, df_bin, k = 5, min_nA = 30)
+head(top_by_A, 20)
+
+
+# --- Per-target summaries: "does each A have at least one strong partner" and "how many moderate partners" ---
+A_selectivity <- function(P, df_bin, min_nA = 30, thr = 0.5) {
+  nA <- colSums(df_bin)
+  out <- lapply(rownames(P), function(A) {
+    if (nA[A] < min_nA) return(NULL)
+    v <- P[A, ]
+    v[A] <- NA
+    v <- v[!is.na(v) & is.finite(v)]
+    data.frame(
+      A = A,
+      n_A = nA[A],
+      maxP = max(v),
+      medianP = median(v),
+      n_partners_ge_thr = sum(v >= thr),
+      stringsAsFactors = FALSE
+    )
+  })
+  do.call(rbind, out)
+}
+
+A_sel_df <- A_selectivity(P, df_bin, min_nA = 30, thr = 0.5)
+A_sel_df[order(A_sel_df$maxP, decreasing = TRUE), ]
+
+row_summary <- list(
+  n_A_rows = nrow(A_sel_df),
+  maxP_summary = summary(A_sel_df$maxP),
+  medianP_summary = summary(A_sel_df$medianP),
+  partners_ge_05_summary = summary(A_sel_df$n_partners_ge_thr)
+)
+row_summary
+
+
+# --- Lift (base-rate corrected enrichment): lift(A→B) = P(B|A) / P(B) ---
+n_cells <- nrow(df_bin)
+pB <- colSums(df_bin) / n_cells
+pB[pB == 0] <- NA  # safety; should rarely/never happen with real targets
+
+lift_mat <- P
+diag(lift_mat) <- NA
+lift_mat <- sweep(lift_mat, 2, pB, FUN = "/")
+
+get_top_lift_pairs <- function(df_bin, P, lift_mat, pB,
+                               top_n = 20, min_nA = 30, min_nAB = 20) {
+  nA  <- colSums(df_bin)
+  nAB <- t(df_bin) %*% df_bin
+  
+  ij <- which(!is.na(lift_mat) & is.finite(lift_mat), arr.ind = TRUE)
+  
+  out <- data.frame(
+    A = rownames(lift_mat)[ij[,1]],
+    B = colnames(lift_mat)[ij[,2]],
+    lift = lift_mat[ij],
+    P_B_given_A = P[ij],
+    p_B = pB[colnames(lift_mat)[ij[,2]]],
+    n_A = nA[rownames(lift_mat)[ij[,1]]],
+    n_AB = as.integer(nAB[cbind(ij[,1], ij[,2])]),
+    stringsAsFactors = FALSE
+  )
+  
+  out <- out[out$n_A >= min_nA & out$n_AB >= min_nAB, , drop = FALSE]
+  out <- out[order(out$lift, decreasing = TRUE), , drop = FALSE]
+  head(out, top_n)
+}
+
+top_lift_pairs <- get_top_lift_pairs(df_bin, P, lift_mat, pB,
+                                     top_n = 20, min_nA = 30, min_nAB = 20)
+top_lift_pairs
 
 ###################################################### Co-occurrence probability matrix (intersection/all) → absolute prevalence of a co-projection pattern in the whole population ######################################################
 # Goal: For each pair of grouped regions (i, j), compute
@@ -543,3 +970,4 @@ heatmap.2(
 )
 dev.copy(pdf, "log2_Jaccard_Co-innervation_over_Co-occurrence.pdf", width = 12, height = 10)
 dev.off()
+

@@ -113,16 +113,38 @@ rm(barcodes_raw, barseq_nuc,bc_true)
 barseq <- LC_barcoded_cells
 
 # MapSeq input, truncate to first 15 characters to ensure that vector legnth is equivalent to BarSeq 15 cycles
-mapseq <- read_tsv("/data/780345_2025-02-20_00-00-00/MAPseq/M295_20250729_USEthis/780345.nbcm.tsv")
+mapseq <- read_tsv("/scratch/BARseq_669594/Bseq_Bnorm_669594.tsv", show_col_types = FALSE)
+
+# # Only keep entries which have at least N counts in one of the bins for matching step
+# mapseq_filt <- mapseq %>%
+#   mutate(rowMAX = do.call(pmax, c(across(where(is.numeric)), na.rm = TRUE))) %>%
+#   filter(rowMAX >= 5)
+# 
+# nrow(mapseq)
+# nrow(mapseq_filt)
+# summary(mapseq_filt$rowMAX)
+# mapseq_filt <- mapseq_filt %>% select(-any_of("rowMAX"))
+# readr::write_tsv(mapseq_filt, "/scratch/BARseq_669594/mapseq_rowMAX_5.tsv")
+# mapseq <- mapseq_filt
+
+# ---- Normalise MAPseq barcode column name to what downstream expects ----
+if ("vbc_read" %in% names(mapseq)) {
+  # already OK
+} else if ("vbc_read_col" %in% names(mapseq)) {
+  mapseq <- mapseq %>% rename(vbc_read = vbc_read_col)
+} else if ("barcode" %in% names(mapseq)) {
+  mapseq <- mapseq %>% rename(vbc_read = barcode)
+} else {
+  stop("No barcode column found. Expected one of: vbc_read, vbc_read_col, barcode")
+}
+# Ensure vbc_read is character (avoids weird parsing)
+mapseq$vbc_read <- as.character(mapseq$vbc_read)
 
 # Find which columns are logical (shouldn't be)
 logical_cols <- sapply(mapseq, is.logical)
 # Convert them to numeric
 mapseq[logical_cols] <- lapply(mapseq[logical_cols], as.numeric)
-# check for naming consistency
-if ("vbc_read_col" %in% names(mapseq)) {
-  names(mapseq)[names(mapseq) == "vbc_read_col"] <- "vbc_read"
-}
+
 mapseq_vbcs <- mapseq$vbc_read
 
 mapseq_vbcs <- substr(mapseq_vbcs, 1, 15)
@@ -297,34 +319,288 @@ print_and_save_duplicates(result_1, proj_1_nodup, "proj_1_duplicated_rows.csv")
 print_and_save_duplicates(result_2, proj_2_nodup, "proj_2_duplicated_rows.csv")
 
 #####################################################################################################################################################################################
-# Only retain cells for genes vs projections processing which pass visual QC
-# Load visual QC info CSV 
-visualQC <- read.csv("LC_visualQC_barcoded_cells.csv", header = TRUE, stringsAsFactors = FALSE)
-# Check that the 'uid' column exists
-if (!"uid" %in% colnames(visualQC)) {
-  stop("No 'uid' column found in LC_visualQC_barcoded_cells.csv")
+# Investigate why so many barcodes have duplicate matches at Hamming distance 1
+
+# Check whether MAPseq has duplicate barcode sequences after truncation to 15
+mapseq_vbc15 <- substr(mapseq$vbc_read, 1, 15)
+
+dup_mapseq15 <- tibble(vbc15 = mapseq_vbc15) %>%
+  dplyr::count(vbc15, name = "n_rows") %>%
+  dplyr::filter(n_rows > 1) %>%
+  dplyr::arrange(dplyr::desc(n_rows))
+
+cat("MAPseq rows:", length(mapseq_vbc15), "\n")
+cat("Unique MAPseq 15bp barcodes:", n_distinct(mapseq_vbc15), "\n")
+cat("Number of duplicated 15bp barcodes:", nrow(dup_mapseq15), "\n")
+cat("Total rows involved in duplicated 15bp barcodes:",
+    sum(dup_mapseq15$n_rows), "\n")
+head(dup_mapseq15, 20)
+
+# Confirm your BARseq cell barcodes themselves aren’t duplicated
+dup_barseq <- barseq %>%
+  dplyr::count(VBC, name = "n_cells") %>%
+  dplyr::filter(n_cells > 1) %>%
+  dplyr::arrange(dplyr::desc(n_cells))
+
+cat("BARseq cells:", nrow(barseq), "\n")
+cat("Unique BARseq VBCs:", n_distinct(barseq$VBC), "\n")
+cat("Number of duplicated VBC sequences:", nrow(dup_barseq), "\n")
+cat("Total cells involved in duplicated VBC sequences:",
+    sum(dup_barseq$n_cells), "\n")
+head(dup_barseq, 20)
+
+# Quantify how many MAPseq rows share the same 15-mer
+mapseq_vbc15 <- substr(mapseq$vbc_read, 1, 15)
+mapseq_15_counts <- tibble(vbc15 = mapseq_vbc15) %>%
+  dplyr::count(vbc15, name = "mapseq_rows")
+summary(mapseq_15_counts$mapseq_rows)
+table(pmin(mapseq_15_counts$mapseq_rows, 5))  # cap at 5 for readability
+
+# For a given match result, see how many CellIDs have >1 MAPseq hit even at dist 0
+cell_hit_counts_0 <- matches_0 %>%
+  dplyr::count(CellID, name = "n_hits") %>%
+  dplyr::filter(n_hits > 1) %>%
+  dplyr::arrange(dplyr::desc(n_hits))
+
+nrow(cell_hit_counts_0)
+head(cell_hit_counts_0, 20)
+
+# Separate two sources of “>1 hit per cell” - Separate two sources of “>1 hit per cell” vs Multiple distinct 15-mers within radius ≤1/2/3
+multi_hit_breakdown_1 <- matches_1 %>%
+  dplyr::mutate(vbc15 = vbc_read) %>%  # already 15bp in your matches
+  dplyr::group_by(CellID) %>%
+  dplyr::summarise(
+    n_hits = dplyr::n(),
+    n_unique_vbc15 = dplyr::n_distinct(vbc15),
+    min_dist = min(dist),
+    .groups = "drop"
+  ) %>%
+  dplyr::mutate(
+    reason = dplyr::case_when(
+      n_hits > 1 & n_unique_vbc15 == 1 ~ "MAPseq duplicated 15-mer (true collision)",
+      n_hits > 1 & n_unique_vbc15  > 1 ~ "multiple distinct 15-mers within radius",
+      TRUE ~ "single hit"
+    )
+  )
+table(multi_hit_breakdown_1$reason)
+multi_hit_breakdown_1 %>% dplyr::filter(reason != "single hit") %>% head(20)
+
+# Look at distribution of matches across different distances for BARseq-MAPseq, including shuffled BARseq sequences
+# 1) Build MAPseq 15-mer set + fast hash (for membership checks)
+mapseq_path <- "/scratch/BARseq_669594/Bseq_Bnorm_669594.tsv"
+#mapseq_path <- "/scratch/BARseq_669594/mapseq_rowMAX_2.tsv"
+
+mapseq_bc <- read_tsv(
+  mapseq_path,
+  col_types = cols_only(barcode = col_character()),
+  show_col_types = FALSE
+)
+
+mapseq_vbc15 <- unique(substr(mapseq_bc$barcode, 1, 15))
+rm(mapseq_bc)
+
+map_env <- new.env(hash = TRUE, parent = emptyenv())
+for (s in mapseq_vbc15) map_env[[s]] <- TRUE
+
+# 2) Helper: global shuffle while keeping position 9 fixed per barcode
+set.seed(1)
+
+barseq_vbc15 <- substr(barseq$VBC, 1, 15)
+stopifnot(all(nchar(barseq_vbc15) == 15))
+
+# Convert to char matrix (n x 15)
+char_mat <- do.call(rbind, strsplit(barseq_vbc15, "", fixed = TRUE))
+
+fixed_pos <- 9
+fixed_col <- char_mat[, fixed_pos]
+
+# Shuffle all other positions globally
+other_pos <- setdiff(1:15, fixed_pos)
+pool <- as.vector(char_mat[, other_pos])
+pool_shuf <- sample(pool, length(pool), replace = FALSE)
+
+char_mat_shuf <- char_mat
+char_mat_shuf[, fixed_pos] <- fixed_col
+char_mat_shuf[, other_pos] <- matrix(pool_shuf, nrow = nrow(char_mat), byrow = FALSE)
+
+barseq_vbc15_shuf_fixed9 <- apply(char_mat_shuf, 1, paste0, collapse = "")
+
+# 3) Minimum distance diagnostic up to 4 mismatches (0,1,2,3,4,>4)
+bases <- c("A","C","G","T")
+
+exists_in_map <- function(s) exists(s, envir = map_env, inherits = FALSE)
+
+has_neighbor_k <- function(s, k) {
+  x <- strsplit(s, "", fixed = TRUE)[[1]]
+  L <- length(x)
+  pos_list <- combn(L, k, simplify = FALSE)
+  
+  for (pos in pos_list) {
+    # allowed replacements per position (exclude original base)
+    choices <- lapply(pos, function(i) bases[bases != x[i]])
+    
+    if (k == 1) {
+      for (b1 in choices[[1]]) {
+        y <- x; y[pos[1]] <- b1
+        if (exists_in_map(paste0(y, collapse = ""))) return(TRUE)
+      }
+    } else if (k == 2) {
+      for (b1 in choices[[1]]) for (b2 in choices[[2]]) {
+        y <- x; y[pos[1]] <- b1; y[pos[2]] <- b2
+        if (exists_in_map(paste0(y, collapse = ""))) return(TRUE)
+      }
+    } else if (k == 3) {
+      for (b1 in choices[[1]]) for (b2 in choices[[2]]) for (b3 in choices[[3]]) {
+        y <- x; y[pos[1]] <- b1; y[pos[2]] <- b2; y[pos[3]] <- b3
+        if (exists_in_map(paste0(y, collapse = ""))) return(TRUE)
+      }
+    } else if (k == 4) {
+      for (b1 in choices[[1]]) for (b2 in choices[[2]]) for (b3 in choices[[3]]) for (b4 in choices[[4]]) {
+        y <- x; y[pos[1]] <- b1; y[pos[2]] <- b2; y[pos[3]] <- b3; y[pos[4]] <- b4
+        if (exists_in_map(paste0(y, collapse = ""))) return(TRUE)
+      }
+    }
+  }
+  FALSE
 }
 
-# Get the list of uids where good_barcoded is TRUE
-good_uids <- visualQC$uid[visualQC$good_barcoded == 1]
-length(good_uids)
-# Subset cells for analyses involving gene expression profiles plus projections
-proj_0_GENES <- proj_0_nodup[proj_0_nodup$CellID %in% good_uids, ]
-dim(proj_0_GENES)
-result_0_GENES <- check_duplicates(proj_0_GENES)
+min_dist_upto4 <- function(s) {
+  if (exists_in_map(s)) return(0L)
+  if (has_neighbor_k(s, 1)) return(1L)
+  if (has_neighbor_k(s, 2)) return(2L)
+  if (has_neighbor_k(s, 3)) return(3L)
+  if (has_neighbor_k(s, 4)) return(4L)
+  5L  # means >4
+}
 
-proj_1_GENES <- proj_1_nodup[proj_1_nodup$CellID %in% good_uids, ]
-dim(proj_1_GENES)
-result_1_GENES <- check_duplicates(proj_1_GENES)
+min_dist_orig <- vapply(barseq_vbc15, min_dist_upto4, integer(1))
+min_dist_shuf <- vapply(barseq_vbc15_shuf_fixed9, min_dist_upto4, integer(1))
 
-proj_2_GENES <- proj_2_nodup[proj_2_nodup$CellID %in% good_uids, ]
-dim(proj_2_GENES)
-result_2_GENES <- check_duplicates(proj_2_GENES)
+# 4) Side-by-side histogram (0,1,2,3,4,>4)
+plot_df <- bind_rows(
+  tibble(type = "Original", min_dist = min_dist_orig),
+  tibble(type = "Shuffled (global, pos9 fixed)", min_dist = min_dist_shuf)
+) %>%
+  mutate(min_dist_label = factor(min_dist, levels = 0:5, labels = c("0","1","2","3","4",">4")))
 
-# Save
-write_csv(proj_0_GENES, "MapSeq_matched_projections_exact_GENES.csv")
-write_csv(proj_1_GENES, "MapSeq_matched_projections_1_mismatch_GENES.csv")
-write_csv(proj_2_GENES, "MapSeq_matched_projections_2_mismatch_GENES.csv")
+ggplot(plot_df, aes(x = min_dist_label)) +
+  geom_bar() +
+  facet_wrap(~type, ncol = 2) +
+  labs(x = "Minimum Hamming distance to any MAPseq 15-mer",
+       y = "Number of BARseq cells") +
+  theme_classic()
+
+# Optional: print counts
+table(plot_df$type, plot_df$min_dist_label)
+
+
+# Examine global cut off levels between brain1 and recent samples to investigate why 1M barcodes are present there, and ~200K and ~100K are true for brain3 and brain4
+brain3 <- read_tsv("/data/780345_2025-02-20_00-00-00/MAPseq/M295_20250729_USEthis/780345.nbcm.tsv")
+brain4 <- read_tsv("/data/780346_2025-06-11_00-00-00/MAPseq/M305_20251030_USEthis/780346.nbcm1025.tsv")
+brain1_orig <- read_tsv("/scratch/BARseq_669594/Bseq_Bnorm_669594.tsv")
+brain1_filt2 <- read_tsv("/scratch/BARseq_669594/mapseq_rowMAX_2.tsv") 
+brain1_filt5<- read_tsv("/scratch/BARseq_669594/mapseq_rowMAX_5.tsv")
+
+rowmax_df <- function(x, dataset_name) {
+  proj <- x %>%
+    select(where(is.numeric)) %>%
+    select(-any_of(c("CellID", "dist", "rowMAX")))  # safety if those ever sneak in
+  
+  tibble(
+    dataset = dataset_name,
+    rowMAX = do.call(pmax, c(proj, na.rm = TRUE))
+  )
+}
+
+rm_all <- bind_rows(
+  rowmax_df(brain3, "M295 (brain3)"),
+  rowmax_df(brain4, "M305 (brain4)"),
+  rowmax_df(brain1_orig, "M240 (brain1 orig)"),
+  rowmax_df(brain1_filt2, "M240 rowMAX>=2"),
+  rowmax_df(brain1_filt5, "M240 rowMAX>=5")
+)
+
+# Faceted histograms
+ggplot(rm_all, aes(x = rowMAX)) +
+  geom_histogram(bins = 100) +
+  facet_wrap(~dataset, scales = "free_y", ncol = 1) +
+  scale_x_continuous(trans = "log1p") +
+  labs(x = "rowMAX across projection columns (log1p)", y = "Count") +
+  theme_classic()
+
+# Overlay (may be visually busy with 5 datasets; faceting is usually clearer)
+ggplot(rm_all, aes(x = rowMAX, fill = dataset)) +
+  geom_histogram(bins = 100, position = "identity", alpha = 0.6) +
+  scale_x_continuous(trans = "log1p") +
+  labs(x = "rowMAX across projection columns (log1p)", y = "Count") +
+  theme_classic()
+
+
+# Examine rowMAX distributions for the 1M original matches at different Hamming distances
+full_match <- read.csv("/scratch/BARseq_669594/1Mreads_input/MapSeq_matched_projections_exact.csv")
+one_mismatch <- read.csv("/scratch/BARseq_669594/1Mreads_input/MapSeq_matched_projections_1_mismatch.csv")
+two_mismatch <- read.csv("/scratch/BARseq_669594/1Mreads_input/MapSeq_matched_projections_2_mismatch.csv")
+head(full_match)
+head(one_mismatch)
+
+rowmax_proj <- function(df, name) {
+  reg_cols <- grep("^reg\\d+$", names(df), value = TRUE)
+  if (length(reg_cols) == 0) stop("No reg* columns found in ", name)
+  
+  reg_df <- df[reg_cols]
+  reg_df[] <- lapply(reg_df, as.numeric)  # force numeric
+  
+  tibble(
+    dataset = name,
+    rowMAX = do.call(pmax, c(reg_df, na.rm = TRUE))
+  )
+}
+
+rm_all <- bind_rows(
+  rowmax_proj(full_match,   "exact"),
+  rowmax_proj(one_mismatch, "1_mismatch"),
+  rowmax_proj(two_mismatch, "2_mismatch")
+)
+
+p_full <- ggplot(rm_all, aes(x = rowMAX)) +
+  geom_histogram(bins = 200) +
+  facet_wrap(~dataset, scales = "free_y", ncol = 1) +
+  labs(x = "rowMAX across reg* columns (raw scale)", y = "Count") +
+  theme_classic()
+
+p_full
+p_full + coord_cartesian(xlim = c(0, 30))
+
+
+#####################################################################################################################################################################################
+# # Only retain cells for genes vs projections processing which pass visual QC
+# # Load visual QC info CSV 
+# visualQC <- read.csv("LC_visualQC_barcoded_cells.csv", header = TRUE, stringsAsFactors = FALSE)
+# # Check that the 'uid' column exists
+# if (!"uid" %in% colnames(visualQC)) {
+#   stop("No 'uid' column found in LC_visualQC_barcoded_cells.csv")
+# }
+# 
+# # Get the list of uids where good_barcoded is TRUE
+# good_uids <- visualQC$uid[visualQC$good_barcoded == 1]
+# length(good_uids)
+# # Subset cells for analyses involving gene expression profiles plus projections
+# proj_0_GENES <- proj_0_nodup[proj_0_nodup$CellID %in% good_uids, ]
+# dim(proj_0_GENES)
+# result_0_GENES <- check_duplicates(proj_0_GENES)
+# 
+# proj_1_GENES <- proj_1_nodup[proj_1_nodup$CellID %in% good_uids, ]
+# dim(proj_1_GENES)
+# result_1_GENES <- check_duplicates(proj_1_GENES)
+# 
+# proj_2_GENES <- proj_2_nodup[proj_2_nodup$CellID %in% good_uids, ]
+# dim(proj_2_GENES)
+# result_2_GENES <- check_duplicates(proj_2_GENES)
+# 
+# # Save
+# write_csv(proj_0_GENES, "MapSeq_matched_projections_exact_GENES.csv")
+# write_csv(proj_1_GENES, "MapSeq_matched_projections_1_mismatch_GENES.csv")
+# write_csv(proj_2_GENES, "MapSeq_matched_projections_2_mismatch_GENES.csv")
 
 
 #####################################################################################################################################################################################
