@@ -284,7 +284,7 @@ barplot(num_cells_per_region, las = 2, col = "lightblue",
         xlab = "", ylab = "Number of cells", main = "Number of Cells per Aggregated Region")
 mtext("Aggregated Region", side = 1, line = 12) 
 par(mar = c(5, 4, 4, 2))  
-dev.copy(pdf, "Combined_absolute_number_of_cells_with_non-zero_projections_to_aggregated_ROI.pdf", width = 8, height = 6)
+dev.copy(pdf, "Combined_absolute_number_of_cells_with_non-zero_projections_to_aggregated_ROI.pdf", width = 12, height = 7)
 dev.off()
 
 # Region level stats for results section
