@@ -9,8 +9,11 @@ source("~/capsule/code/1_BARseq_analyses_functions_brain3-4_combined.R")
 # Set working directory
 setwd(BARSEQ_OUTPUT_DIR)
 
+##########################################################################################################
+# Isolating LC-NE population fromFULL dataset where brain3 and brain4 cells are combined at post-QC step
+##########################################################################################################
 ############################################################################################################################################################################################################
-# load LC-NE isolated, normalized gene expression data, concatenate the matrices
+# load normalized gene expression data, concatenate the matrices - this is all cells which pass QC filter regardless of identity
 brain3 <- readRDS("/scratch/BARseq_780345/combined_neurons_clust_CCFv2_uid_cpm_log.rds") 
 dim (brain3)
 
@@ -57,12 +60,12 @@ dim(combined_sce)
 colData(combined_sce)$batch <- c(rep("brain3", ncol(brain3_subset)), rep("brain4", ncol(brain4)))
 
 ####################################### perform initial clustering and check for batch effects ###############################################################################################
-# Check if clustering analysis already exists
+# Check if clustering analysis already exists given this is large data set and takes a while to run
 output_dir <- "analysis/barseq_all_QCed_cells"
 umap_file <- file.path(output_dir, "umap.csv")
 cluster_file <- file.path(output_dir, "cluster.csv")
 annot_file <- file.path(output_dir, "cluster_annotation.csv")
-library(readr)
+
 if (dir.exists(output_dir) && file.exists(umap_file) && file.exists(cluster_file) && file.exists(annot_file)) {
   cat("All analysis results already exist for barseq_all_QCed_cells. Skipping.\n")
 } else if (dir.exists(output_dir) && file.exists(umap_file)) {
@@ -240,7 +243,7 @@ gene_expression_summary <- plot_data_cluster %>%
     Slc18a2_mean = mean(Slc18a2, na.rm = TRUE)
   )
 print(gene_expression_summary)
-write.csv(gene_expression_summary, file = "gene_expression_summary_by_cluster.csv", row.names = FALSE)
+write.csv(gene_expression_summary, file = "all_QCed_cells_gene_expression_summary_by_cluster.csv", row.names = FALSE)
 
 # Calculate mean expression for each gene across clusters
 cluster_labels <- clusters[["label"]]
@@ -307,7 +310,7 @@ combination_counts <- expression_df %>%
   arrange(desc(cell_count))
 # View the results
 print(combination_counts)
-write.csv(combination_counts, file = "gene_coexpression_summary_LC_cluster.csv", row.names = FALSE)
+write.csv(combination_counts, file = "all_QCed_cells_gene_coexpression_summary_LC_cluster.csv", row.names = FALSE)
 
 # Ensure that the sample names in clusters match the column names of barseq
 if (!all(clusters[['sample']] == colnames(combined_sce))) {
@@ -440,7 +443,7 @@ for (gene in genes) {
 }
 p_combined3 <- grid.arrange(grobs = plots_genes, ncol = 2, nrow = 2)
 print(p_combined3)
-ggsave("LCcluster_gene_expression.pdf", plot = p_combined3, device = "pdf", width = 10, height = 8)  
+ggsave("LCcluster_cells_gene_expression.pdf", plot = p_combined3, device = "pdf", width = 10, height = 8)  
 
 #include cluster assignment data to the original SingleCellExperiment object
 table(clusters$label)
@@ -480,7 +483,7 @@ if (nrow(brain4_df) > 0) {
 
 # Subset out LC-NE proper cells
 table(clusters$label)
-LCNE_barseq <- LC_barseq[, colData(LC_barseq)$louvain_cluster %in% c(1,2)]
+LCNE_barseq <- LC_barseq[, colData(LC_barseq)$louvain_cluster %in% c(1,2,6)]
 dim(LCNE_barseq)
 saveRDS(LCNE_barseq, "LCNE_cluster_neurons_CCFv2_uid.rds")
 
@@ -771,11 +774,11 @@ ggsave("spatial_density_violin.pdf", plot=p, width = 8, height = 8, units = "in"
 
 # Examine distribution and possible cut off points
 summary(meta_df$spatial_density_3D)
-cutoff <- quantile(meta_df$spatial_density_3D, probs = 0.05)  # bottom 5%
+cutoff <- quantile(meta_df$spatial_density_3D, probs = 0.01)  # bottom 1%
 p <- ggplot(meta_df, aes(x = spatial_density_3D)) +
   geom_histogram(bins = 100, fill = "lightgray", color = "black") +
   geom_vline(xintercept = cutoff, color = "red", linetype = "dashed") +
-  labs(title = "Histogram with Bottom 5% Density Cutoff",
+  labs(title = "Histogram with Bottom 1% Density Cutoff",
        x = "3D Spatial Density Score", y = "Cell count") +
   theme_minimal()
 print(p)
@@ -788,7 +791,7 @@ meta_df <- as.data.frame(colData(LCNE_barseq)) %>%
     UMAP1 = umap_df$UMAP1,
     UMAP2 = umap_df$UMAP2,
     louvain_cluster = as.factor(louvain_cluster),
-    low_density_flag = spatial_density_3D < quantile(spatial_density_3D, 0.05) 
+    low_density_flag = spatial_density_3D < quantile(spatial_density_3D, 0.01) 
   )
 # Density color map
 p <- ggplot(meta_df, aes(x = UMAP1, y = UMAP2, color = spatial_density_3D)) +
@@ -814,7 +817,7 @@ ggsave("spatial_density_UMAP_cut.pdf", plot=p, width = 8, height = 8, units = "i
 # Set absolute coherence cutoff
 coherence_cutoff <- 0.05  # Or any other fixed value you prefer
 # Set quantile-based density cutoff (bottom 5%)
-density_cutoff <- quantile(meta_df$spatial_density_3D, 0.05, na.rm = TRUE)
+density_cutoff <- quantile(meta_df$spatial_density_3D, 0.01, na.rm = TRUE)
 # Apply filtering
 meta_df <- meta_df %>%
   mutate(
@@ -1043,7 +1046,9 @@ dev.off()
 
 ################################################################################################################################################################################################################
 ######################################################## compare the LC-NE final overlap between combined and separate processing ##############################################################################
+################################################################################################################################################################################################################
 fromFULL <- readRDS("LCNE_clusters_filtered_coherence_filtered_cpm_log_clust.rds")
+dim(fromFULL)
 summary(Matrix::colSums(assay(fromFULL, "cpm")))
 summary(Matrix::colSums(assay(fromFULL, "logcounts")))
 
@@ -1447,7 +1452,7 @@ for (gene in genes) {
 }
 p_combined3 <- grid.arrange(grobs = plots_genes, ncol = 2, nrow = 2)
 print(p_combined3)
-ggsave("fromLCNE_combined_LCcluster_gene_expression.pdf", plot = p_combined3, device = "pdf", width = 10, height = 8)  
+ggsave("fromLCNE_combined_LCcluster_gene_expression.pdf", plot = p_combined3, device = "pdf", width = 10, height = 14)  
 
 #include cluster assignment data to the original SingleCellExperiment object
 table(clusters$label)
@@ -1485,6 +1490,12 @@ if (nrow(brain4_df) > 0) {
   print(brain4_plot)
   ggsave("fromLCNE_combined_LC_cluster_cells_slices_brain4.pdf", plot = brain4_plot, device = "pdf", width = 20, height = 12)
 }
+
+
+
+
+
+
 
 
 
@@ -2055,12 +2066,20 @@ dev.off()
 
 
 
+
+
+
+
 ###################################################################################################################################################################################
 # Troubleshooting comparisons between cells for LCNE isolation combined at the outset vs each sample processed separately first and MAPseq/BARseq overlap
 ###################################################################################################################################################################################
 ################################## Check what is the divergence between unique and overlapping cells for fromFULL and fromLCNE subsetting #########################################
 # Extract cell IDs
+fromFULL <- readRDS("LCNE_clusters_filtered_coherence_filtered_cpm_log_clust.rds")
+dim(fromFULL)
 cells_fromFULL <- colnames(fromFULL)
+fromLCNE <- readRDS("fromLCNE_combined_LCcluster_neurons_CCFv2_uid_cpm_log_clust.rds")
+dim(fromLCNE)
 cells_fromLCNE <- colnames(fromLCNE)
 # Find shared cells
 shared_cells <- intersect(cells_fromFULL, cells_fromLCNE)
@@ -2236,7 +2255,10 @@ print(mapseq_brain3_df)
 cat("MAPseq data for unique LCNE cells in brain4:\n")
 print(mapseq_brain4_df)
 
-############################################################# check DE genes between brain3 and 4 for combined and separate processing ###############################################################
+####################################################################################################################################################################################### 
+# check DE genes between brain3 and 4 for combined and separate processing 
+#########################################################################################################################################################################################
+
 # Function to perform DE
 perform_de <- function(sce, assay_name = "logcounts") {
   # Extract expression matrix
@@ -2253,13 +2275,13 @@ perform_de <- function(sce, assay_name = "logcounts") {
 
 # For fromFULL 
 de_fromFULL <- perform_de(fromFULL, "logcounts")
-head(de_fromFULL)  # View top results
+head(de_fromFULL)
 de_fromFULL$gene <- rownames(de_fromFULL)
-significant <- de_fromFULL[de_fromFULL$P.Value < 0.05, ]  # Adjust threshold as needed
+significant <- de_fromFULL[de_fromFULL$P.Value < 0.05, ]
 ggplot(de_fromFULL, aes(x = AveExpr, y = logFC)) +
   geom_point(alpha = 0.5, color = "grey") +
-  geom_point(data = significant, aes(x = AveExpr, y = logFC), color = "red") +  # Highlight significant
-  geom_text_repel(data = significant, aes(label = gene), size = 3, max.overlaps = 10) +  # Label significant
+  geom_point(data = significant, aes(x = AveExpr, y = logFC), color = "red") +
+  geom_text_repel(data = significant, aes(label = gene), size = 3, max.overlaps = 10) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   labs(title = "fromFULL", x = "Average Expression", y = "logFC") +
   theme_minimal()
@@ -2281,7 +2303,6 @@ ggplot(de_fromLCNE, aes(x = AveExpr, y = logFC)) +
 get_gene_stats <- function(sce, genes) {
   stats_list <- list()
   for (gene in genes) {
-    # Raw counts
     raw_expr <- assay(sce, "counts")[gene, ]
     raw_by_batch <- colData(sce) %>% 
       as.data.frame() %>% 
@@ -2292,7 +2313,6 @@ get_gene_stats <- function(sce, genes) {
         median_raw = median(expr, na.rm = TRUE),
         sd_raw = sd(expr, na.rm = TRUE)
       )
-    # Logcounts (if available)
     if ("logcounts" %in% assayNames(sce)) {
       log_expr <- assay(sce, "logcounts")[gene, ]
       log_by_batch <- colData(sce) %>% 
@@ -2315,15 +2335,12 @@ get_gene_stats <- function(sce, genes) {
 
 genes <- c("Dbh", "Th", "Tacr3", "Slc18a2")
 
-# For fromFULL
 stats_fromFULL <- get_gene_stats(fromFULL, genes)
 print(stats_fromFULL)
 
-# For fromLCNE
 stats_fromLCNE <- get_gene_stats(fromLCNE, genes)
 print(stats_fromLCNE)
 
-# Combine stats into a single dataframe
 combine_stats <- function(stats_list, dataset_name) {
   bind_rows(stats_list, .id = "gene") %>%
     mutate(dataset = dataset_name)
@@ -2332,21 +2349,580 @@ combine_stats <- function(stats_list, dataset_name) {
 df_fromFULL <- combine_stats(stats_fromFULL, "fromFULL")
 df_fromLCNE <- combine_stats(stats_fromLCNE, "fromLCNE")
 combined_df <- bind_rows(df_fromFULL, df_fromLCNE)
-print(combined_df)  # View as dataframe
+print(combined_df)
 
-# Visualization: Boxplot of logcounts per gene per batch (across datasets)
 ggplot(combined_df, aes(x = gene, y = mean_log, fill = batch)) +
   geom_bar(stat = "identity", position = "dodge") +
   facet_wrap(~ dataset) +
   labs(title = "Mean Log Expression by Gene and Batch", y = "Mean Log Counts") +
   theme_minimal()
 
-# For raw counts: Replace mean_log with mean_raw
 ggplot(combined_df, aes(x = gene, y = mean_raw, fill = batch)) +
   geom_bar(stat = "identity", position = "dodge") +
   facet_wrap(~ dataset) +
   labs(title = "Mean Raw Counts by Gene and Batch", y = "Mean Raw Counts") +
   theme_minimal()
+
+##########################################################################################################################################################################################
+# Gene distribution QC + targeted correction for Dbh
+# CONTEXT:
+#   - BARseq data, two brains (brain3, brain4) profiling the same
+#     noradrenergic neuron population with the same probe panel.
+#   - Genes from sequencing cycles (Th, Slc18a2, ...) show good 
+#     inter-batch agreement; brain3 is generally slightly higher.
+#   - Genes from hybridization cycles (Dbh, Tacr3) show batch
+#     differences — Dbh is anomalously HIGH in brain4, opposite 
+#     to the general trend. Tacr3 has a modest difference.
+#   - Without Dbh/Tacr3, no batch correction is needed.
+#
+# CORRECTION DECISION:
+#   - Dbh: CORRECT. Massive batch effect (logFC=0.53, t=29.4,
+#     #1 DE gene). Hybridization artifact clearly dominant.
+#   - Tacr3: DO NOT CORRECT. Modest effect (logFC=0.10, t=7.9).
+#     Correction in count space is too aggressive because Tacr3
+#     has very low counts (median expressing = 1-2), so 
+#     round(count * k) with k=0.5 zeroes out many cells,
+#     collapsing detection rate from 0.294 to 0.184 and 
+#     overshooting the target. Better left uncorrected.
+#
+# NORMALIZATION PIPELINE (custom BARseq):
+#   1. convert_to_cpm(counts, total_counts = 10)
+#      -> divides each cell's counts by (colSum / 10)
+#   2. logcounts = log1p(cpm) / log(2) = log2(1 + cpm)
+#
+# CORRECTION STRATEGY:
+#   Work directly from raw COUNTS for Dbh only, then 
+#   re-normalize using the same pipeline to ensure consistency.
+#   Scale factor estimated from median of EXPRESSING cells 
+#   (counts > 0) to avoid zero-inflation bias.
+##########################################################################################################################################################################################
+
+genes     <- c("Dbh", "Th", "Tacr3", "Slc18a2")
+genes_adj <- c("Dbh")  # Dbh only; Tacr3 excluded (see rationale above)
+
+stopifnot(all(genes %in% rownames(fromLCNE)))
+stopifnot("batch" %in% colnames(colData(fromLCNE)))
+stopifnot("counts" %in% assayNames(fromLCNE))
+stopifnot("logcounts" %in% assayNames(fromLCNE))
+
+############################################################
+# 1) Helper: make a long dataframe for plotting
+############################################################
+make_long_expr_df <- function(sce, genes, batch_col = "batch", log_assay_name = "logcounts") {
+  stopifnot(batch_col %in% colnames(colData(sce)))
+  stopifnot(all(genes %in% rownames(sce)))
+  stopifnot("counts" %in% assayNames(sce))
+  stopifnot(log_assay_name %in% assayNames(sce))
+  
+  meta <- as.data.frame(colData(sce))
+  meta$cell_id <- colnames(sce)
+  
+  # counts
+  counts_mat <- assay(sce, "counts")[genes, , drop = FALSE]
+  df_counts <- as.data.frame(t(as.matrix(counts_mat)))
+  df_counts$cell_id <- rownames(df_counts)
+  
+  counts_long <- df_counts %>%
+    pivot_longer(cols = all_of(genes), names_to = "gene", values_to = "value") %>%
+    left_join(meta[, c("cell_id", batch_col)], by = "cell_id") %>%
+    rename(batch = all_of(batch_col)) %>%
+    mutate(assay = "counts", value = as.numeric(value))
+  
+  # chosen log assay
+  log_mat <- assay(sce, log_assay_name)[genes, , drop = FALSE]
+  df_log <- as.data.frame(t(as.matrix(log_mat)))
+  df_log$cell_id <- rownames(df_log)
+  
+  log_long <- df_log %>%
+    pivot_longer(cols = all_of(genes), names_to = "gene", values_to = "value") %>%
+    left_join(meta[, c("cell_id", batch_col)], by = "cell_id") %>%
+    rename(batch = all_of(batch_col)) %>%
+    mutate(assay = log_assay_name, value = as.numeric(value))
+  
+  bind_rows(counts_long, log_long)
+}
+
+############################################################
+# 2) QC plots BEFORE correction
+############################################################
+df_before <- make_long_expr_df(fromLCNE, genes, batch_col = "batch", log_assay_name = "logcounts")
+
+# 2a) logcounts histograms (absolute count)
+ggplot(df_before %>% filter(assay == "logcounts"),
+       aes(x = value, fill = batch)) +
+  geom_histogram(position = "identity", alpha = 0.45, bins = 50) +
+  facet_wrap(~ gene, scales = "free_x", ncol = 2) +
+  labs(title = "fromLCNE BEFORE: logcounts distributions by batch",
+       x = "logcounts", y = "Number of cells") +
+  theme_minimal()
+
+# 2b) logcounts — density (properly normalized per batch)
+ggplot(df_before %>% filter(assay == "logcounts"),
+       aes(x = value, fill = batch)) +
+  geom_histogram(aes(y = after_stat(density)),
+                 position = "identity", alpha = 0.45, bins = 50) +
+  facet_wrap(~ gene, scales = "free_x", ncol = 2) +
+  labs(title = "fromLCNE BEFORE: logcounts distributions by batch (density)",
+       x = "logcounts", y = "Density") +
+  theme_minimal()
+
+# 2c) log1p(raw counts) histograms
+df_counts_before <- df_before %>%
+  filter(assay == "counts") %>%
+  mutate(value_log1p = log1p(value))
+
+ggplot(df_counts_before, aes(x = value_log1p, fill = batch)) +
+  geom_histogram(position = "identity", alpha = 0.45, bins = 50) +
+  facet_wrap(~ gene, scales = "free_x", ncol = 2) +
+  labs(title = "fromLCNE BEFORE: log1p(raw counts) distributions by batch",
+       x = "log1p(counts)", y = "Number of cells") +
+  theme_minimal()
+
+# 2d) Tacr3 expressing cells only (logcounts > 0)
+ggplot(df_before %>% filter(assay == "logcounts", gene == "Tacr3", value > 0),
+       aes(x = value, fill = batch)) +
+  geom_histogram(position = "identity", alpha = 0.45, bins = 50) +
+  labs(title = "fromLCNE BEFORE: Tacr3 logcounts (expressing cells only)",
+       x = "Tacr3 logcounts (value > 0)", y = "Number of cells") +
+  theme_minimal()
+
+# 2e) Per-cell total counts (depth/efficiency proxy)
+tot <- colSums(assay(fromLCNE, "counts"))
+df_tot <- data.frame(batch = colData(fromLCNE)$batch, total = tot)
+
+ggplot(df_tot, aes(x = log1p(total), fill = batch)) +
+  geom_histogram(position = "identity", alpha = 0.45, bins = 60) +
+  labs(title = "fromLCNE: per-cell total counts (log1p)",
+       x = "log1p(total counts per cell)", y = "Number of cells") +
+  theme_minimal()
+
+############################################################
+# 3) Targeted correction: Dbh only, in RAW COUNT SPACE
+#
+#    Scale factor from median of EXPRESSING cells (counts > 0)
+#    to avoid zero-inflation bias.
+#    Direction: brain4 Dbh is anomalously high → scale DOWN.
+#    k = median(brain3_expressing) / median(brain4_expressing)
+#    Applied to expressing brain4 cells only; zeros stay zero.
+############################################################
+
+counts_mat <- assay(fromLCNE, "counts")
+batch      <- colData(fromLCNE)$batch
+idx3       <- batch == "brain3"
+idx4       <- batch == "brain4"
+
+counts_adj <- counts_mat   # copy; we only modify Dbh
+
+min_pos <- 30  # minimum expressing cells per batch for reliable estimate
+
+# --- Dbh correction ---
+g <- "Dbh"
+c3     <- counts_mat[g, idx3]
+c4     <- counts_mat[g, idx4]
+c3_pos <- c3[c3 > 0]
+c4_pos <- c4[c4 > 0]
+
+cat("\n--- Dbh diagnostics ---\n")
+cat("brain3: n_total =", length(c3), ", n_expressing =", length(c3_pos),
+    ", detect_rate =", round(length(c3_pos)/length(c3), 3),
+    ", median_expressing =", median(c3_pos),
+    ", mean_expressing =", round(mean(c3_pos), 2), "\n")
+cat("brain4: n_total =", length(c4), ", n_expressing =", length(c4_pos),
+    ", detect_rate =", round(length(c4_pos)/length(c4), 3),
+    ", median_expressing =", median(c4_pos),
+    ", mean_expressing =", round(mean(c4_pos), 2), "\n")
+
+stopifnot(length(c3_pos) >= min_pos && length(c4_pos) >= min_pos)
+
+k_dbh <- median(c3_pos) / median(c4_pos)
+cat("Dbh scale factor (brain4 expressing -> brain3 expressing):", signif(k_dbh, 4), "\n")
+cat("Expected effect: brain4 Dbh expressing counts multiplied by", signif(k_dbh, 4), "then rounded\n")
+
+# Apply to expressing brain4 cells only (zeros stay zero)
+pos4_dbh <- idx4 & (counts_mat[g, ] > 0)
+counts_adj[g, pos4_dbh] <- round(counts_mat[g, pos4_dbh] * k_dbh)
+
+# Sanity checks
+stopifnot(all(counts_adj[g, idx4 & (counts_mat[g, ] == 0)] == 0))  # zeros preserved
+stopifnot(all(counts_adj[g, idx3] == counts_mat[g, idx3]))          # brain3 unchanged
+
+# --- Confirm all other genes are untouched ---
+for (g_check in setdiff(rownames(counts_mat), "Dbh")) {
+  stopifnot(identical(as.numeric(counts_adj[g_check, ]),
+                      as.numeric(counts_mat[g_check, ])))
+}
+cat("Sanity checks passed: Dbh zeros preserved, brain3 unchanged, all other genes identical.\n")
+
+# --- Log Tacr3 stats for the record (not corrected, but documented) ---
+cat("\n--- Tacr3 (NOT corrected — documented for reference) ---\n")
+g <- "Tacr3"
+c3t <- counts_mat[g, idx3]; c3t_pos <- c3t[c3t > 0]
+c4t <- counts_mat[g, idx4]; c4t_pos <- c4t[c4t > 0]
+cat("brain3: n_expressing =", length(c3t_pos), ", detect_rate =", round(length(c3t_pos)/sum(idx3), 3),
+    ", median_expressing =", median(c3t_pos), "\n")
+cat("brain4: n_expressing =", length(c4t_pos), ", detect_rate =", round(length(c4t_pos)/sum(idx4), 3),
+    ", median_expressing =", median(c4t_pos), "\n")
+cat("Hypothetical k_tacr3 would be:", signif(median(c3t_pos)/median(c4t_pos), 4),
+    "— NOT applied (too aggressive for low-count gene)\n")
+
+# Store corrected counts
+assay(fromLCNE, "counts_adj_Dbh") <- counts_adj
+
+############################################################
+# 4) Re-normalize corrected counts using the SAME pipeline
+#    as the original BARseq processing:
+#
+#    convert_to_cpm(counts, total_counts = 10):
+#      cpm_ij = counts_ij / (colSum_j / 10)
+#    logcounts = log1p(cpm) / log(2) = log2(1 + cpm)
+#
+#    Using ORIGINAL per-cell totals as denominator so that
+#    correcting one gene doesn't ripple into normalization
+#    of all other genes.
+############################################################
+
+cat("\n--- Re-normalizing corrected counts ---\n")
+
+# Original per-cell totals
+totals_orig <- Matrix::colSums(counts_mat)
+normalization_factor <- 10
+
+# Replicate convert_to_cpm: divide by (colSum / total_counts)
+if (is(counts_adj, "dgCMatrix")) {
+  cpm_adj <- counts_adj
+  cpm_adj@x <- cpm_adj@x / rep.int(totals_orig / normalization_factor, diff(cpm_adj@p))
+} else {
+  cpm_adj <- sweep(counts_adj, 2, totals_orig / normalization_factor, "/")
+}
+
+# log2(1 + cpm), matching: logcounts = log1p(cpm) / log(2)
+logcounts_adj <- log1p(cpm_adj) / log(2)
+
+# Store adjusted assays
+assay(fromLCNE, "cpm_adj_Dbh")       <- cpm_adj
+assay(fromLCNE, "logcounts_adj_Dbh")  <- logcounts_adj
+cat("Stored assays: counts_adj_Dbh, cpm_adj_Dbh, logcounts_adj_Dbh\n")
+
+# --- Verification: all genes except Dbh should have identical logcounts ---
+cat("\nVerification — max logcounts difference per gene (should be 0 for non-Dbh):\n")
+for (g_check in genes) {
+  orig_log <- as.numeric(assay(fromLCNE, "logcounts")[g_check, ])
+  adj_log  <- as.numeric(assay(fromLCNE, "logcounts_adj_Dbh")[g_check, ])
+  max_diff <- max(abs(adj_log - orig_log))
+  cat(" ", g_check, ":", signif(max_diff, 4),
+      ifelse(g_check == "Dbh", " (corrected — expected difference)", ""), "\n")
+}
+
+# Spot-check: does re-normalization reproduce original for untouched gene?
+g_test <- "Th"
+orig  <- as.numeric(assay(fromLCNE, "logcounts")[g_test, 1:5])
+recalc <- as.numeric(logcounts_adj[g_test, 1:5])
+cat("\nSpot-check Th (first 5 cells):\n")
+cat("  Original:     ", round(orig, 6), "\n")
+cat("  Recalculated: ", round(recalc, 6), "\n")
+cat("  Match:", all.equal(orig, recalc), "\n")
+
+############################################################
+# 5) QC plots AFTER correction
+############################################################
+df_after <- make_long_expr_df(fromLCNE, genes, batch_col = "batch",
+                              log_assay_name = "logcounts_adj_Dbh")
+
+# 5a) Density histograms: Dbh before vs after
+plot_density_hist <- function(df, title_prefix) {
+  df_log <- df %>% filter(assay != "counts")
+  ggplot(df_log, aes(x = value, fill = batch)) +
+    geom_histogram(aes(y = after_stat(density)),
+                   position = "identity", alpha = 0.45, bins = 50) +
+    facet_wrap(~ gene, scales = "free_x", ncol = 2) +
+    labs(title = title_prefix, x = unique(df_log$assay), y = "Density") +
+    theme_minimal()
+}
+
+plot_density_hist(df_before %>% filter(gene == "Dbh"),
+                  "fromLCNE BEFORE: Dbh (density)")
+
+plot_density_hist(df_after %>% filter(gene == "Dbh"),
+                  "fromLCNE AFTER: Dbh (density)")
+
+# 5b) All four genes AFTER — confirm Th/Slc18a2/Tacr3 unchanged
+plot_density_hist(df_after,
+                  "fromLCNE AFTER correction: all 4 genes (density)")
+
+# 5c) Dbh expressing-only before vs after
+plot_gene_pos <- function(df, gene_name, title) {
+  df_log <- df %>% filter(assay != "counts", gene == gene_name, value > 0)
+  ggplot(df_log, aes(x = value, fill = batch)) +
+    geom_histogram(aes(y = after_stat(density)),
+                   position = "identity", alpha = 0.45, bins = 50) +
+    labs(title = title, x = unique(df_log$assay), y = "Density") +
+    theme_minimal()
+}
+
+plot_gene_pos(df_before, "Dbh", "Dbh expressing-only BEFORE (logcounts)")
+plot_gene_pos(df_after,  "Dbh", "Dbh expressing-only AFTER (logcounts_adj_Dbh)")
+
+############################################################
+# 6) Summary stats before vs after
+############################################################
+get_gene_stats2 <- function(sce, genes, counts_assay = "counts", log_assay = "logcounts") {
+  stats_list <- list()
+  for (gene in genes) {
+    raw_expr <- assay(sce, counts_assay)[gene, ]
+    raw_by_batch <- colData(sce) %>%
+      as.data.frame() %>%
+      mutate(expr = as.numeric(raw_expr)) %>%
+      group_by(batch) %>%
+      summarise(
+        n_cells = n(),
+        n_expressing = sum(expr > 0),
+        detect_rate = round(mean(expr > 0), 3),
+        mean_raw = round(mean(expr), 3),
+        median_raw = median(expr),
+        median_raw_expressing = median(expr[expr > 0]),
+        sd_raw = round(sd(expr), 3),
+        .groups = "drop"
+      )
+    
+    log_expr <- assay(sce, log_assay)[gene, ]
+    log_by_batch <- colData(sce) %>%
+      as.data.frame() %>%
+      mutate(expr = as.numeric(log_expr)) %>%
+      group_by(batch) %>%
+      summarise(
+        mean_log = round(mean(expr), 4),
+        median_log = round(median(expr), 4),
+        sd_log = round(sd(expr), 4),
+        .groups = "drop"
+      )
+    
+    stats_list[[gene]] <- left_join(raw_by_batch, log_by_batch, by = "batch")
+  }
+  stats_list
+}
+
+cat("BEFORE correction\n")
+stats_before <- get_gene_stats2(fromLCNE, genes,
+                                counts_assay = "counts",
+                                log_assay = "logcounts")
+print(bind_rows(stats_before, .id = "gene"))
+
+
+cat("AFTER correction (Dbh only)\n")
+stats_after <- get_gene_stats2(fromLCNE, genes,
+                               counts_assay = "counts_adj_Dbh",
+                               log_assay = "logcounts_adj_Dbh")
+print(bind_rows(stats_after, .id = "gene"))
+
+# Side-by-side comparison
+df_compare <- bind_rows(
+  bind_rows(stats_before, .id = "gene") %>% mutate(stage = "before"),
+  bind_rows(stats_after,  .id = "gene") %>% mutate(stage = "after")
+)
+print(df_compare)
+
+############################################################
+# 7) Re-run DE on corrected assay — KEY VALIDATION
+#    Expectation: Dbh should drop from #1 DE gene to non-significant.
+#    Tacr3/Th/Slc18a2 should be essentially unchanged.
+############################################################
+de_fromLCNE_adj <- perform_de(fromLCNE, assay_name = "logcounts_adj_Dbh")
+de_fromLCNE_adj$gene <- rownames(de_fromLCNE_adj)
+
+cat("DE results BEFORE correction (top 10):\n")
+print(head(de_fromLCNE, 10))
+
+
+cat("DE results AFTER correction — Dbh only (top 10):\n")
+print(head(de_fromLCNE_adj, 10))
+
+cat("\nTarget genes before vs after:\n")
+cat("--- BEFORE ---\n")
+print(de_fromLCNE[de_fromLCNE$gene %in% c("Dbh", "Tacr3", "Th", "Slc18a2"), ])
+cat("--- AFTER ---\n")
+print(de_fromLCNE_adj[de_fromLCNE_adj$gene %in% c("Dbh", "Tacr3", "Th", "Slc18a2"), ])
+
+# MA plot for corrected data
+significant_adj <- de_fromLCNE_adj[de_fromLCNE_adj$P.Value < 0.05, ]
+ggplot(de_fromLCNE_adj, aes(x = AveExpr, y = logFC)) +
+  geom_point(alpha = 0.5, color = "grey") +
+  geom_point(data = significant_adj, aes(x = AveExpr, y = logFC), color = "red") +
+  geom_text_repel(data = significant_adj, aes(label = gene), size = 3, max.overlaps = 10) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(title = "fromLCNE AFTER Dbh correction",
+       x = "Average Expression", y = "logFC") +
+  theme_minimal()
+
+####################################################################################################################################################################################
+# UMAP + clustering on Dbh-corrected fromLCNE object
+#
+# Before running this, ensure you have:
+#   - fromLCNE with assays: counts_adj_Dbh, cpm_adj_Dbh, logcounts_adj_Dbh
+#   - The analyze_barseq function available in your environment
+#
+# Key decision: analyze_barseq likely uses logcounts internally
+# for PCA/UMAP. We need to temporarily set the "logcounts" assay
+# to our corrected version so that the function picks it up,
+# OR pass the corrected assay name if analyze_barseq supports it.
+#
+# Strategy below: create a working copy, swap in the corrected
+# logcounts as the default "logcounts" assay, run the analysis,
+# then visualize.
+####################################################################################################################################################################################
+
+# Create working copy from the Dbh-corrected fromLCNE
+Dbh_corrected_test <- fromLCNE
+
+# Replace the logcounts assay with the Dbh-corrected version
+# so that analyze_barseq (which reads "logcounts") uses the corrected values
+assay(Dbh_corrected_test, "logcounts_original") <- assay(Dbh_corrected_test, "logcounts")
+assay(Dbh_corrected_test, "logcounts") <- assay(Dbh_corrected_test, "logcounts_adj_Dbh")
+
+# Sanity check: confirm the swap
+cat("Logcounts assay now points to Dbh-corrected values.\n")
+cat("Dbh mean_log brain3:", round(mean(assay(Dbh_corrected_test, "logcounts")["Dbh", colData(Dbh_corrected_test)$batch == "brain3"]), 4), "\n")
+cat("Dbh mean_log brain4:", round(mean(assay(Dbh_corrected_test, "logcounts")["Dbh", colData(Dbh_corrected_test)$batch == "brain4"]), 4), "\n")
+cat("Th  mean_log brain3:", round(mean(assay(Dbh_corrected_test, "logcounts")["Th", colData(Dbh_corrected_test)$batch == "brain3"]), 4), "(should be unchanged)\n")
+
+# Run analysis (PCA + UMAP + clustering)
+v <- analyze_barseq(Dbh_corrected_test, "Dbh_corrected_test")
+new_barseq <- v[[1]]
+clusters <- v[[2]]
+
+# Set up color palette
+n_clusters <- length(unique(clusters[["label"]]))
+color_palette <- get_cluster_colors(n_clusters)
+
+# Extract UMAP coordinates and total gene counts
+umap_data <- reducedDim(new_barseq, "UMAP")
+total_genes <- colSums(counts(new_barseq))
+
+# Create plotting data frames
+plot_data_cluster <- data.frame(
+  UMAP1 = umap_data[,1],
+  UMAP2 = umap_data[,2],
+  cluster = factor(clusters[["label"]])
+)
+plot_data_genes <- data.frame(
+  UMAP1 = umap_data[,1],
+  UMAP2 = umap_data[,2],
+  TotalGenes = total_genes
+)
+plot_data_batch <- data.frame(
+  UMAP1 = umap_data[,1],
+  UMAP2 = umap_data[,2],
+  batch = colData(Dbh_corrected_test)$batch
+)
+
+# Sort data for TotalGenes to plot higher values on top
+plot_data_genes <- plot_data_genes %>%
+  dplyr::arrange(TotalGenes)
+
+# Calculate cluster centroids
+centroid_data <- plot_data_cluster %>%
+  dplyr::group_by(cluster) %>%
+  dplyr::summarise(x = mean(UMAP1), y = mean(UMAP2))
+
+# Plot UMAP with clusters
+p1 <- ggplot(plot_data_cluster, aes(x = UMAP1, y = UMAP2, color = cluster)) +
+  geom_point(size = 0.05) +
+  scale_color_manual(values = color_palette) +
+  geom_text(data = centroid_data, aes(x = x, y = y, label = cluster),
+            colour = "black", vjust = 1.6, hjust = 0.5, size = 3.5) +
+  theme_minimal() +
+  theme(legend.position = "none", panel.grid = element_blank()) +
+  labs(title = "UMAP plot", x = "UMAP1", y = "UMAP2", color = "Cluster")
+
+# Plot UMAP with total gene counts
+p2 <- ggplot(plot_data_genes, aes(x = UMAP1, y = UMAP2, color = TotalGenes)) +
+  geom_point(size = 0.05) +
+  scale_color_gradient(low = "grey", high = "magenta") +
+  theme_minimal() +
+  theme(panel.grid = element_blank()) +
+  labs(title = "Total counts", x = "UMAP1", y = "UMAP2", color = "Gene Count")
+
+# Plot UMAP with batch
+p3 <- ggplot(plot_data_batch, aes(x = UMAP1, y = UMAP2, color = batch)) +
+  geom_point(size = 0.05, alpha = 0.1) +
+  scale_color_manual(values = c("brain3" = "blue", "brain4" = "green")) +
+  theme_minimal() +
+  theme(panel.grid = element_blank()) +
+  labs(title = "Batch", x = "UMAP1", y = "UMAP2", color = "Batch")
+
+# 3 panels (clusters, total genes, batch)
+p_combined1 <- grid.arrange(grobs = list(p1, p2, p3), ncol = 3)
+print(p_combined1)
+ggsave("LCNE_cells_clusters_genes_batch_Dbh_corrected.pdf",
+       plot = p_combined1, device = "pdf", width = 14, height = 8)
+
+# Gene expression on UMAP — now using corrected logcounts
+# Include Dbh and Tacr3 alongside the other markers to visualize
+# how the correction affects their spatial distribution
+genes <- c("Dbh", "Th", "Tacr3", "Slc18a2", "Ddc", "Dlk1")
+plots_genes <- list()
+
+for (gene in genes) {
+  # Use the corrected logcounts (which is now the default "logcounts" assay)
+  plot_data_cluster[[gene]] <- logcounts(Dbh_corrected_test)[gene, ]
+  
+  plot_data_sorted <- plot_data_cluster %>%
+    dplyr::arrange(!!sym(gene))
+  
+  p <- ggplot(plot_data_sorted, aes(x = UMAP1, y = UMAP2, color = !!sym(gene))) +
+    geom_point(size = 0.02) +
+    scale_color_gradient(low = "cyan", high = "red") +
+    theme_minimal() +
+    theme(panel.grid = element_blank()) +
+    labs(title = paste(gene, "Expression"), x = "UMAP1", y = "UMAP2", color = "Logcounts")
+  
+  plots_genes[[length(plots_genes) + 1]] <- p
+}
+
+p_combined3 <- grid.arrange(grobs = plots_genes, ncol = 3, nrow = 2)
+print(p_combined3)
+ggsave("LCNE_cells_gene_expression_Dbh_corrected.pdf",
+       plot = p_combined3, device = "pdf", width = 10, height = 14)
+
+# Include cluster assignment data in the SCE object
+table(clusters$label)
+all(clusters[['sample']] == colnames(Dbh_corrected_test))  # should be TRUE
+colData(Dbh_corrected_test)$louvain_cluster <- as.factor(clusters[["label"]])
+
+# Save — note: this object has "logcounts" = corrected, "logcounts_original" = uncorrected
+saveRDS(Dbh_corrected_test, "Dbh_corrected_fromLCNE_CCFv2_uid_cpm_log_clust.rds")
+
+
+# Export corrected logcounts for Dbh, Th, Slc18a2
+# Uses the corrected assay (logcounts_adj_Dbh) from fromLCNE
+
+genes_export <- c("Dbh", "Th", "Slc18a2")
+
+# Extract corrected logcounts for selected genes
+log_mat <- assay(fromLCNE, "logcounts_adj_Dbh")[genes_export, , drop = FALSE]
+
+# Transpose so cells are rows, genes are columns
+df_export <- as.data.frame(t(as.matrix(log_mat)))
+
+# Add batch info
+df_export$batch <- colData(fromLCNE)$batch
+
+# Cell IDs are already the rownames from colnames(fromLCNE)
+cat("First few rows:\n")
+head(df_export)
+
+# Write to CSV with row.names = TRUE to retain cell IDs
+write.csv(df_export, file = "Dbh_Th_Slc18a2_logcounts_adj_Dbh.csv", row.names = TRUE)
+cat("Exported", nrow(df_export), "cells x", ncol(df_export), "columns to Dbh_Th_Slc18a2_logcounts_adj_Dbh.csv\n")
+
+
+
+
+
+
+
+
+
+
 
 ############################################################# CCA integrate brain3 and 4 gene expression to batch correct ###############################################################
 # Convert SCE to Seurat
