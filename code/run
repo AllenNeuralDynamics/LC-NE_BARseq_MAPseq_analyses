@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euxo pipefail
+
+# # Step 0: Load environment and libraries
+# Rscript 00_env_library_loading.R "$@"
+
+# Helper: render an R script to HTML via knitr::spin and save to /results/
+render_html() {
+  local script="$1"
+  local outname
+  outname="$(basename "${script%.R}").html"
+  Rscript -e "
+    rmd <- knitr::spin('$script', knit = FALSE, format = 'Rmd')
+    rmarkdown::render(rmd, output_format = 'html_document',
+                      output_file = '$outname', output_dir = '/results/')
+    file.remove(rmd)
+  "
+}
+
+# Step 1a: Convert Brain 1 .mat to .rds
+render_html 01_BarSeq_RDSconvert_brain1_v2.R
+
+# Step 1b: Convert Brain 3 .mat to .rds
+render_html 01_BarSeq_RDSconvert_brain3_v2.R
+
+# Step 1c: Convert Brain 4 .mat to .rds
+render_html 01_BarSeq_RDSconvert_brain4_v2.R
+
+echo "=== Reproducible Run complete. HTML reports and results saved to /results/ ==="
