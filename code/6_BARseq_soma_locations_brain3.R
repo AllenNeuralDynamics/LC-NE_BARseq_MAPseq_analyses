@@ -1,5 +1,5 @@
 #set working directory 
-setwd('/scratch/BARseq_780345/')
+setwd('/results/BARseq_780345/')
 
 ################################################## load and pre-process relevant files ######################################################
 # coordinates of all possible cells for plotting, only keep cells with at least one gene count

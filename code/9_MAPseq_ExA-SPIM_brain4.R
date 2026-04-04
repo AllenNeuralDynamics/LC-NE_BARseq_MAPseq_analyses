@@ -2,7 +2,7 @@
 source("~/capsule/code/01_loaders_brain4.R")
 
 #set working directory 
-setwd('/scratch/BARseq_780346/')
+setwd('/results/BARseq_780346/')
 
 dat <- load_data()
 names(dat)

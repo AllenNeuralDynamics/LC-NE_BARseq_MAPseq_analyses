@@ -2,7 +2,8 @@
 
 # Set up paths
 BARSEQ_INPUT_DIR <- '/data/BARseq_MATtoRDSfiles_brain3_brain4/BARseq_780346/'  # read-only
-BARSEQ_OUTPUT_DIR <- '/scratch/BARseq_780345-780346_combined/'  # writable
+BARSEQ_OUTPUT_DIR <- '/results/BARseq_780345-780346_combined/'  # writable
+BARSEQ_CLUSTERING_DIR <- '/data/BARseq_780345-780346_combined_analysis_clustering/'  # pre-computed clustering, read-only
 
 # Ensure output directory exists
 if (!dir.exists(BARSEQ_OUTPUT_DIR)) {
@@ -171,7 +172,7 @@ clear_objects_except_functions <- function() {
   })]
   
   # Also keep your directory paths
-  to_keep <- c(to_keep, "BARSEQ_INPUT_DIR", "BARSEQ_OUTPUT_DIR")
+  to_keep <- c(to_keep, "BARSEQ_INPUT_DIR", "BARSEQ_OUTPUT_DIR","BARSEQ_CLUSTERING_DIR")
   
   to_remove <- setdiff(obj_list, to_keep)
   

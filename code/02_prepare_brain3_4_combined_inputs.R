@@ -4,7 +4,7 @@
 
 prepare_brain3_4_inputs <- function(
     loaders_path = "~/capsule/code/01_loaders_brain3-4_combined.R",
-    out_dir = "/scratch/BARseq_780345-780346_combined/",
+    out_dir = "/results/BARseq_780345-780346_combined/",
     do_cerebellum_merge = TRUE,
     cerebellum_groups = c("RH.12", "LH.12"),
     fix_amyg_gpe = TRUE,

@@ -6,7 +6,7 @@
 load_data_brain3 <-function() {
   
   # Set working directory
-  setwd('/scratch/BARseq_780345/')
+  setwd('/results/BARseq_780345/')
   
   # Read in raw projection matrix
   projection_matrix <- readr::read_csv("./MapSeq_matched_projections_1_mismatch.csv", col_names = TRUE)
@@ -406,7 +406,7 @@ load_data_brain3 <-function() {
 load_data_brain4 <-function() {
   
   # Set working directory
-  setwd('/scratch/BARseq_780346/')
+  setwd('/results/BARseq_780346/')
   
   # Read in raw projection matrix
   projection_matrix <- readr::read_csv("./MapSeq_matched_projections_1_mismatch.csv", col_names = TRUE)

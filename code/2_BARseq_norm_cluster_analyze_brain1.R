@@ -26,7 +26,9 @@ barseq <- readRDS('combined_neurons_clust_CCFv2_uid_cpm_log.rds') #normalization
 dim(barseq)
 
 # Check if clustering analysis already exists
-if (dir.exists("analysis/barseq_all_QCed_cells") && file.exists("analysis/barseq_all_QCed_cells/umap.csv") && file.exists("analysis/barseq_all_QCed_cells/cluster.csv")) {
+if (dir.exists("/data/BARseq_669594_analysis_clustering/barseq_all_QCed_cells") && 
+    file.exists("/data/BARseq_669594_analysis_clustering/barseq_all_QCed_cells/umap.csv") && 
+    file.exists("/data/BARseq_669594_analysis_clustering/barseq_all_QCed_cells/cluster.csv")) {
   cat("Analysis results already exist for barseq_all_QCed_cells. Skipping clustering step.\n")
 } else {
   cat("Running clustering analysis for barseq_all_QCed_cells...\n")
@@ -438,7 +440,7 @@ clear_objects_except_functions()
 # Load data and stored UMAP info
 LCNE_barseq <- readRDS("LCcluster_neurons_CCFv2_uid_cpm_log_clust.rds")
 
-umap_path <- "/scratch/BARseq_669594/analysis/barseq_LCcluster_cells/umap.csv"
+umap_path <- "/results/BARseq_669594/analysis/barseq_LCcluster_cells/umap.csv"
 umap_df <- read.csv(umap_path, header = TRUE)
 
 #Compute kNN-based cluster purity: proportion of same-cluster neighbors.

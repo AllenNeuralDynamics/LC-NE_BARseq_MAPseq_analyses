@@ -14,10 +14,10 @@ setwd(BARSEQ_OUTPUT_DIR)
 ##########################################################################################################
 ############################################################################################################################################################################################################
 # load normalized gene expression data, concatenate the matrices - this is all cells which pass QC filter regardless of identity
-brain3 <- readRDS("/scratch/BARseq_780345/combined_neurons_clust_CCFv2_uid_cpm_log.rds") 
+brain3 <- readRDS("/results/BARseq_780345/combined_neurons_clust_CCFv2_uid_cpm_log.rds") 
 dim (brain3)
 
-brain4 <- readRDS("/scratch/BARseq_780346/combined_neurons_clust_CCFv2_uid_cpm_log.rds") 
+brain4 <- readRDS("/results/BARseq_780346/combined_neurons_clust_CCFv2_uid_cpm_log.rds") 
 dim(brain4)
 
 # Examine why gene vectors are different length, only keep shared genes
@@ -61,34 +61,38 @@ colData(combined_sce)$batch <- c(rep("brain3", ncol(brain3_subset)), rep("brain4
 
 ####################################### perform initial clustering and check for batch effects ###############################################################################################
 # Check if clustering analysis already exists given this is large data set and takes a while to run
-output_dir <- "analysis/barseq_all_QCed_cells"
-umap_file <- file.path(output_dir, "umap.csv")
-cluster_file <- file.path(output_dir, "cluster.csv")
-annot_file <- file.path(output_dir, "cluster_annotation.csv")
+# Paths: check pre-computed data asset first, fall back to writing new results
+clustering_data_dir <- file.path(BARSEQ_CLUSTERING_DIR, "barseq_all_QCed_cells")
+clustering_results_dir <- file.path(BARSEQ_OUTPUT_DIR, "analysis/barseq_all_QCed_cells")
 
-if (dir.exists(output_dir) && file.exists(umap_file) && file.exists(cluster_file) && file.exists(annot_file)) {
-  cat("All analysis results already exist for barseq_all_QCed_cells. Skipping.\n")
-} else if (dir.exists(output_dir) && file.exists(umap_file)) {
+umap_file    <- file.path(clustering_data_dir, "umap.csv")
+cluster_file <- file.path(clustering_data_dir, "cluster.csv")
+annot_file   <- file.path(clustering_data_dir, "cluster_annotation.csv")
+
+if (dir.exists(clustering_data_dir) && file.exists(umap_file) && file.exists(cluster_file) && file.exists(annot_file)) {
+  cat("All analysis results already exist in data asset. Skipping clustering.\n")
+} else if (dir.exists(clustering_data_dir) && file.exists(umap_file)) {
   cat("UMAP exists but clustering incomplete. Loading UMAP and running PCA-based clustering...\n")
-  # Load UMAP
   umap_mat <- as.matrix(read_csv(umap_file))
   rownames(umap_mat) <- colnames(combined_sce)
   reducedDim(combined_sce, "UMAP") <- umap_mat
-  # Run PCA and clustering
   v <- analyze_barseq_pca_only(combined_sce, "barseq_all_QCed_cells")
+  # update paths to newly written results
+  umap_file    <- file.path(clustering_results_dir, "umap.csv")
+  cluster_file <- file.path(clustering_results_dir, "cluster.csv")
 } else {
   cat("Running full clustering analysis for barseq_all_QCed_cells...\n")
-  v <- analyze_barseq(combined_sce, "barseq_all_QCed_cells")  # Full pipeline if nothing exists
+  v <- analyze_barseq(combined_sce, "barseq_all_QCed_cells")
+  # update paths to newly written results
+  umap_file    <- file.path(clustering_results_dir, "umap.csv")
+  cluster_file <- file.path(clustering_results_dir, "cluster.csv")
 }
 
-# plot the results from clustering on the whole dataset
-# load saved umap and cluster information for data including all the neurons
-file_path <- file.path(BARSEQ_OUTPUT_DIR, "analysis/barseq_all_QCed_cells/umap.csv")
-umap_data <- read.csv(file_path)
-file_path <- file.path(BARSEQ_OUTPUT_DIR, "analysis/barseq_all_QCed_cells/cluster.csv")
-clusters <- read.csv(file_path)
-x<-umap_data[['UMAP1']]
-y<-umap_data[['UMAP2']]
+# Load umap and cluster for plotting — paths already set correctly above
+umap_data <- read.csv(umap_file)
+clusters  <- read.csv(cluster_file)
+x <- umap_data[['UMAP1']]
+y <- umap_data[['UMAP2']]
 
 #visualize UMAP of samples 
 n_clusters <- length(unique(clusters[["label"]]))
@@ -685,7 +689,7 @@ clear_objects_except_functions()
 # Load data and stored UMAP info
 LCNE_barseq <- readRDS("LCNE_neurons_CCFv2_uid_cpm_log_clust.rds")
 
-umap_path <- "/scratch/BARseq_780345-780346_combined/analysis/barseq_LC_NE_cells/umap.csv"
+umap_path <- "/results/BARseq_780345-780346_combined/analysis/barseq_LC_NE_cells/umap.csv"
 umap_df <- read.csv(umap_path, header = TRUE)
 
 #Compute kNN-based cluster purity: proportion of same-cluster neighbors.
@@ -1053,12 +1057,12 @@ summary(Matrix::colSums(assay(fromFULL, "cpm")))
 summary(Matrix::colSums(assay(fromFULL, "logcounts")))
 
 # Load separately processed datasets and concatenate them
-brain3 <- readRDS("/scratch/BARseq_780345/LCNE_clusters_filtered_coherence_filtered_cpm_log_clust.rds")
+brain3 <- readRDS("/results/BARseq_780345/LCNE_clusters_filtered_coherence_filtered_cpm_log_clust.rds")
 dim(brain3)
 summary(Matrix::colSums(assay(brain3, "cpm")))
 summary(Matrix::colSums(assay(brain3, "logcounts")))
 
-brain4 <- readRDS("/scratch/BARseq_780346/LCNE_clusters_filtered_coherence_filtered_cpm_log_clust.rds")
+brain4 <- readRDS("/results/BARseq_780346/LCNE_clusters_filtered_coherence_filtered_cpm_log_clust.rds")
 dim(brain4)
 summary(Matrix::colSums(assay(brain4, "cpm")))
 summary(Matrix::colSums(assay(brain4, "logcounts")))
@@ -1705,7 +1709,7 @@ clear_objects_except_functions()
 # Load data and stored UMAP info
 LCNE_barseq <- readRDS("LCNE_neurons_CCFv2_uid_cpm_log_clust.rds")
 
-umap_path <- "/scratch/BARseq_780345-780346_combined/analysis/barseq_LC_NE_cells/umap.csv"
+umap_path <- "/results/BARseq_780345-780346_combined/analysis/barseq_LC_NE_cells/umap.csv"
 umap_df <- read.csv(umap_path, header = TRUE)
 
 #Compute kNN-based cluster purity: proportion of same-cluster neighbors.
@@ -2994,9 +2998,9 @@ saveRDS(integrated_seurat, "integrated_seurat.rds")
 
 ############################################################# drop Dbh and Tacr3 from analyses ###############################################################
 # # Load separately processed datasets and concatenate them
-# brain3 <- readRDS("/scratch/BARseq_780345/LCNE_clusters_filtered_coherence_filtered_cpm_log_clust.rds")
+# brain3 <- readRDS("/results/BARseq_780345/LCNE_clusters_filtered_coherence_filtered_cpm_log_clust.rds")
 # dim(brain3)
-# brain4 <- readRDS("/scratch/BARseq_780346/LCNE_clusters_filtered_coherence_filtered_cpm_log_clust.rds")
+# brain4 <- readRDS("/results/BARseq_780346/LCNE_clusters_filtered_coherence_filtered_cpm_log_clust.rds")
 # dim(brain4)
 # # Examine why gene vectors are different length, only keep shared genes
 # # Extract gene names from both objects

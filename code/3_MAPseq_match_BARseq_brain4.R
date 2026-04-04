@@ -3,7 +3,7 @@
 # Identifies uniquely barcoded BARseq cells which have a match in the MAPseq dataset with 0,1,2,or 3 Hamming distance mismatches allowed
 
 #set working directory 
-setwd('/scratch/BARseq_780346/')
+setwd('/results/BARseq_780346/')
 ############################################################################################################################################################################################################
 # Sanity checks for QC of the MAPseq data
 UMI_filt <- read_tsv("/data/780346_2025-06-11_00-00-00/MAPseq/M305_20251030_USEthis/780346.nbcm1025.tsv")

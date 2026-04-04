@@ -3,7 +3,7 @@
 # Identifies uniquely barcoded BARseq cells which have a match in the MAPseq dataset with 0,1,2,or 3 Hamming distance mismatches allowed
 
 #set working directory 
-setwd('/scratch/BARseq_669594/')
+setwd('/results/BARseq_669594/')
 # ############################################################################################################################################################################################################
 # # Sanity checks for QC of the MAPseq data
 # UMI_filt <- read_tsv("/data/780345_2025-02-20_00-00-00/MAPseq/M295_20250729_USEthis/780345.nbcm.tsv")
@@ -59,7 +59,7 @@ table(colData(LCNEcluster)$barcode)
 table(colData(LCNEcluster)$louvain_cluster)
 
 ############################################################# pull out barcode sequences for LC-NE cells which are barcoded ###########################################################
-csv_path <- "/scratch/BARseq_669594/soma_bc_with_slice_id.csv"
+csv_path <- "/results/BARseq_669594/soma_bc_with_slice_id.csv"
 df <- read_csv(csv_path, show_col_types = FALSE)
 dim(df)
 head(df)
@@ -113,7 +113,7 @@ rm(barcodes_raw, barseq_nuc,bc_true)
 barseq <- LC_barcoded_cells
 
 # MapSeq input, truncate to first 15 characters to ensure that vector legnth is equivalent to BarSeq 15 cycles
-mapseq <- read_tsv("/scratch/BARseq_669594/Bseq_Bnorm_669594.tsv", show_col_types = FALSE)
+mapseq <- read_tsv("/results/BARseq_669594/Bseq_Bnorm_669594.tsv", show_col_types = FALSE)
 
 # # Only keep entries which have at least N counts in one of the bins for matching step
 # mapseq_filt <- mapseq %>%
@@ -124,7 +124,7 @@ mapseq <- read_tsv("/scratch/BARseq_669594/Bseq_Bnorm_669594.tsv", show_col_type
 # nrow(mapseq_filt)
 # summary(mapseq_filt$rowMAX)
 # mapseq_filt <- mapseq_filt %>% select(-any_of("rowMAX"))
-# readr::write_tsv(mapseq_filt, "/scratch/BARseq_669594/mapseq_rowMAX_5.tsv")
+# readr::write_tsv(mapseq_filt, "/results/BARseq_669594/mapseq_rowMAX_5.tsv")
 # mapseq <- mapseq_filt
 
 # ---- Normalise MAPseq barcode column name to what downstream expects ----
@@ -387,8 +387,8 @@ multi_hit_breakdown_1 %>% dplyr::filter(reason != "single hit") %>% head(20)
 
 # Look at distribution of matches across different distances for BARseq-MAPseq, including shuffled BARseq sequences
 # 1) Build MAPseq 15-mer set + fast hash (for membership checks)
-mapseq_path <- "/scratch/BARseq_669594/Bseq_Bnorm_669594.tsv"
-#mapseq_path <- "/scratch/BARseq_669594/mapseq_rowMAX_2.tsv"
+mapseq_path <- "/results/BARseq_669594/Bseq_Bnorm_669594.tsv"
+#mapseq_path <- "/results/BARseq_669594/mapseq_rowMAX_2.tsv"
 
 mapseq_bc <- read_tsv(
   mapseq_path,
@@ -497,9 +497,9 @@ table(plot_df$type, plot_df$min_dist_label)
 # Examine global cut off levels between brain1 and recent samples to investigate why 1M barcodes are present there, and ~200K and ~100K are true for brain3 and brain4
 brain3 <- read_tsv("/data/780345_2025-02-20_00-00-00/MAPseq/M295_20250729_USEthis/780345.nbcm.tsv")
 brain4 <- read_tsv("/data/780346_2025-06-11_00-00-00/MAPseq/M305_20251030_USEthis/780346.nbcm1025.tsv")
-brain1_orig <- read_tsv("/scratch/BARseq_669594/Bseq_Bnorm_669594.tsv")
-brain1_filt2 <- read_tsv("/scratch/BARseq_669594/mapseq_rowMAX_2.tsv") 
-brain1_filt5<- read_tsv("/scratch/BARseq_669594/mapseq_rowMAX_5.tsv")
+brain1_orig <- read_tsv("/results/BARseq_669594/Bseq_Bnorm_669594.tsv")
+brain1_filt2 <- read_tsv("/results/BARseq_669594/mapseq_rowMAX_2.tsv") 
+brain1_filt5<- read_tsv("/results/BARseq_669594/mapseq_rowMAX_5.tsv")
 
 rowmax_df <- function(x, dataset_name) {
   proj <- x %>%
@@ -537,9 +537,9 @@ ggplot(rm_all, aes(x = rowMAX, fill = dataset)) +
 
 
 # Examine rowMAX distributions for the 1M original matches at different Hamming distances
-full_match <- read.csv("/scratch/BARseq_669594/1Mreads_input/MapSeq_matched_projections_exact.csv")
-one_mismatch <- read.csv("/scratch/BARseq_669594/1Mreads_input/MapSeq_matched_projections_1_mismatch.csv")
-two_mismatch <- read.csv("/scratch/BARseq_669594/1Mreads_input/MapSeq_matched_projections_2_mismatch.csv")
+full_match <- read.csv("/results/BARseq_669594/1Mreads_input/MapSeq_matched_projections_exact.csv")
+one_mismatch <- read.csv("/results/BARseq_669594/1Mreads_input/MapSeq_matched_projections_1_mismatch.csv")
+two_mismatch <- read.csv("/results/BARseq_669594/1Mreads_input/MapSeq_matched_projections_2_mismatch.csv")
 head(full_match)
 head(one_mismatch)
 

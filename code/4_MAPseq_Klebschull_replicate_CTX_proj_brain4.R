@@ -1,7 +1,7 @@
 ################# MAPseq Barcode checks for CTX slices replicating Klebschull paper ##################
 
 #set working directory 
-setwd('/scratch/BARseq_780346/')
+setwd('/results/BARseq_780346/')
 
 #####################################################################################################################################################################################
 #read in files which contain relevant information for projections such as projection matrix, cell IDs and cluster types

@@ -2,7 +2,7 @@
 
 # Set up paths
 BARSEQ_INPUT_DIR <- '/data/BARseq_MATtoRDSfiles_brain1/BARseq_669594/'  #read-only
-BARSEQ_OUTPUT_DIR <- '/scratch/BARseq_669594/'  # writable
+BARSEQ_OUTPUT_DIR <- '/results/BARseq_669594/'  # writable
 
 # Ensure output directory exists
 if (!dir.exists(BARSEQ_OUTPUT_DIR)) {

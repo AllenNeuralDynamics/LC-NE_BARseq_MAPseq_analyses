@@ -24,21 +24,24 @@ barseq <- readRDS('combined_neurons_clust_CCFv2_uid_cpm_log.rds') #normalization
 dim(barseq)
 
 # Check if clustering analysis already exists
-if (dir.exists("analysis/barseq_all_QCed_cells") && file.exists("analysis/barseq_all_QCed_cells/umap.csv") && file.exists("analysis/barseq_all_QCed_cells/cluster.csv")) {
+clustering_data_dir <- file.path(BARSEQ_CLUSTERING_DIR, "barseq_all_QCed_cells")
+
+if (dir.exists(clustering_data_dir) && 
+    file.exists(file.path(clustering_data_dir, "umap.csv")) && 
+    file.exists(file.path(clustering_data_dir, "cluster.csv"))) {
   cat("Analysis results already exist for barseq_all_QCed_cells. Skipping clustering step.\n")
+  umap_read_dir <- clustering_data_dir
 } else {
   cat("Running clustering analysis for barseq_all_QCed_cells...\n")
   v <- analyze_barseq(barseq, "barseq_all_QCed_cells")
+  umap_read_dir <- file.path(BARSEQ_OUTPUT_DIR, "analysis/barseq_all_QCed_cells")
 }
 
 # plot the results from clustering on the whole dataset
-# load saved umap and cluster information for data including all the neurons
-file_path <- file.path(BARSEQ_OUTPUT_DIR, "analysis/barseq_all_QCed_cells/umap.csv")
-umap_data <- read.csv(file_path)
-file_path <- file.path(BARSEQ_OUTPUT_DIR, "analysis/barseq_all_QCed_cells/cluster.csv")
-clusters <- read.csv(file_path)
-x<-umap_data[['UMAP1']]
-y<-umap_data[['UMAP2']]
+umap_data <- read.csv(file.path(umap_read_dir, "umap.csv"))
+clusters  <- read.csv(file.path(umap_read_dir, "cluster.csv"))
+x <- umap_data[['UMAP1']]
+y <- umap_data[['UMAP2']]
 
 #visualize UMAP of samples 
 n_clusters <- length(unique(clusters[["label"]]))
@@ -530,7 +533,7 @@ clear_objects_except_functions()
 # Load data and stored UMAP info
 LCNE_barseq <- readRDS("LCNE_neurons_CCFv2_uid_cpm_log_clust.rds")
 
-umap_path <- "/scratch/BARseq_780346/analysis/barseq_LC_NE_cells/umap.csv"
+umap_path <- "/results/BARseq_780346/analysis/barseq_LC_NE_cells/umap.csv"
 umap_df <- read.csv(umap_path, header = TRUE)
 
 #Compute kNN-based cluster purity: proportion of same-cluster neighbors.

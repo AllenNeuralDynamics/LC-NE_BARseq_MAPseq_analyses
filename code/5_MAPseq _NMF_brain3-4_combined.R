@@ -1,136 +1,6 @@
-# # Load functions which handle pre-processing or organizing of the data
-# source("~/capsule/code/01_loaders_brain3-4_combined.R")
-# 
-# brain3 <- load_data_brain3()
-# names(brain3)
-# # Extract components
-# brain3_raw_proj_matrix <- as.data.frame(brain3$proj_matrix_raw)
-# # Preserve original rownames
-# rownames(brain3_raw_proj_matrix) <- rownames(brain3$proj_matrix_raw)
-# brain3_inRH_lookup <- brain3$inRH_lookup
-# brain3_metadata <- brain3$metadata
-# 
-# brain4 <- load_data_brain4()
-# names(brain4)
-# # Extract components
-# brain4_raw_proj_matrix <- as.data.frame(brain4$proj_matrix_raw)
-# # Preserve original rownames
-# rownames(brain4_raw_proj_matrix) <- rownames(brain4$proj_matrix_raw)
-# brain4_inRH_lookup <- brain4$inRH_lookup
-# brain4_metadata <- brain4$metadata
-# 
-# #set working directory to save things to
-# setwd('/scratch/BARseq_780345-780346_combined/')
-# 
-# # Ensure ROI compatibility between brain3 and brain4 ROIs 
-# colnames(brain3_raw_proj_matrix)
-# colnames(brain4_raw_proj_matrix)
-# # Correct Amyg-GPe spelling
-# colnames(brain4_raw_proj_matrix) <- stringr::str_replace_all(colnames(brain4_raw_proj_matrix), "amyg-Gpe", "amyg-GPe")
-# # Sum cerebellum sections into one sample
-# groups <- c("RH.12", "LH.12")
-# for (group in groups) {
-#   i_col <- paste0("cerebellum I_", group)
-#   ii_col <- paste0("cerebellum II_", group)
-#   new_col <- paste0("cerebellum_", group)
-#   if (i_col %in% colnames(brain4_raw_proj_matrix) && ii_col %in% colnames(brain4_raw_proj_matrix)) {
-#     # Sum the projections
-#     brain4_raw_proj_matrix[, new_col] <- brain4_raw_proj_matrix[, i_col] + brain4_raw_proj_matrix[, ii_col]
-#     # Remove the original I and II columns
-#     brain4_raw_proj_matrix <- brain4_raw_proj_matrix[, !(colnames(brain4_raw_proj_matrix) %in% c(i_col, ii_col))]
-#     cat("Summed", i_col, "+", ii_col, "into", new_col, "\n")
-#   } else {
-#     cat("Warning: Columns for", group, "not found\n")
-#   }
-# }
-# 
-# # Sum columns with corresponding base ROI names to enhance dataset compatibility - brain3
-# dim(brain3_raw_proj_matrix)
-# head(brain3_raw_proj_matrix)
-# brain3_result <- sum_by_base_roi(brain3_raw_proj_matrix)
-# brain3_summed <- brain3_result$summed_matrix
-# dim(brain3_summed)
-# head(brain3_summed)
-# brain3_mapping <- brain3_result$mapping
-# cat("Brain3 mapping (what was combined into each base ROI):\n")
-# for (base in names(brain3_mapping)) {
-#   cat(base, ":", paste(brain3_mapping[[base]], collapse = ", "), "\n")
-# }
-# 
-# # Sum columns with corresponding base ROI names to enhance dataset compatibility - brain4
-# dim(brain4_raw_proj_matrix)
-# head(brain4_raw_proj_matrix)
-# brain4_result <- sum_by_base_roi(brain4_raw_proj_matrix)
-# brain4_summed <- brain4_result$summed_matrix
-# dim(brain4_summed)
-# head(brain4_summed)
-# brain4_mapping <- brain4_result$mapping
-# cat("\nBrain4 mapping:\n")
-# for (base in names(brain4_mapping)) {
-#   cat(base, ":", paste(brain4_mapping[[base]], collapse = ", "), "\n")
-# }
-# 
-# # Apply ipsi-contra to brain3 summed matrix
-# ipsi_contra_brain3 <- create_ipsi_contra_from_matrix(brain3_summed, brain3_inRH_lookup, "brain3 summed")
-# head(ipsi_contra_brain3)
-# 
-# # Apply ipsi-contra to brain4 summed matrix
-# ipsi_contra_brain4 <- create_ipsi_contra_from_matrix(brain4_summed, brain4_inRH_lookup, "brain4 summed")
-# head(ipsi_contra_brain4)
-# 
-# # Get column names from the ipsi-contra matrices
-# brain3_cols <- colnames(ipsi_contra_brain3)
-# brain4_cols <- colnames(ipsi_contra_brain4)
-# # Find shared regions (exact matches)
-# shared_regions <- intersect(brain3_cols, brain4_cols)
-# # Find unique regions
-# unique_brain3 <- setdiff(brain3_cols, brain4_cols)
-# unique_brain4 <- setdiff(brain4_cols, brain3_cols)
-# # Print results
-# cat("Shared regions (", length(shared_regions), "):\n")
-# if (length(shared_regions) > 0) {
-#   cat(paste(sort(shared_regions), collapse = ", "), "\n\n")
-# }
-# cat("Unique to brain3 (", length(unique_brain3), "):\n")
-# if (length(unique_brain3) > 0) {
-#   cat(paste(sort(unique_brain3), collapse = ", "), "\n\n")
-# }
-# cat("Unique to brain4 (", length(unique_brain4), "):\n")
-# if (length(unique_brain4) > 0) {
-#   cat(paste(sort(unique_brain4), collapse = ", "), "\n\n")
-# }
-# 
-# # Subset to shared regions
-# brain3_shared <- ipsi_contra_brain3[, shared_regions, drop = FALSE]
-# head(brain3_shared)
-# brain4_shared <- ipsi_contra_brain4[, shared_regions, drop = FALSE]
-# head(brain4_shared)
-# 
-# # Normalize each subset
-# brain3_shared_norm <- normalize_projection_matrix(brain3_shared, "brain3 shared ipsi-contra")
-# head(brain3_shared_norm)
-# brain4_shared_norm <- normalize_projection_matrix(brain4_shared, "brain4 shared ipsi-contra")
-# head(brain4_shared_norm)
-# 
-# # Combine the normalized subsets
-# combined_norm <- as.data.frame(rbind(brain3_shared_norm, brain4_shared_norm))
-# head(combined_norm)
-# cat("Combined normalized matrix dimensions:", dim(combined_norm), "\n")
-# 
-# # Preserve rownames before conversion
-# original_rownames <- rownames(combined_norm)
-# # Convert to numeric matrix
-# combined_norm <- as.matrix(combined_norm)
-# combined_norm <- apply(combined_norm, 2, as.numeric)  # Ensure numeric
-# combined_norm <- as.matrix(combined_norm)
-# # Reassign rownames
-# rownames(combined_norm) <- original_rownames
-# head(combined_norm) 
-
-
 source("~/capsule/code/02_prepare_brain3_4_combined_inputs.R")
 
-OUT_DIR <- "/scratch/BARseq_780345-780346_combined/"
+OUT_DIR <- "/results/BARseq_780345-780346_combined/"
 
 prep <- prepare_brain3_4_inputs(
   loaders_path = "~/capsule/code/01_loaders_brain3-4_combined.R",
@@ -612,8 +482,8 @@ nmf_sel$mean_factor_sparsity_gini
 ##########################################################################################################################################
 # check how factor loading relates to transcriptomic identity
 # ensure that only data from properly segmented cells is being utilized here
-good_cells_brain3 <- read.csv("/scratch/BARseq_780345/LC_visualQC_barcoded_cells.csv")
-good_cells_brain4 <- read.csv("/scratch/BARseq_780346/LC_visualQC_barcoded_cells.csv")
+good_cells_brain3 <- read.csv("/results/BARseq_780345/LC_visualQC_barcoded_cells.csv")
+good_cells_brain4 <- read.csv("/results/BARseq_780346/LC_visualQC_barcoded_cells.csv")
 # Select only the relevant columns (uid and good_barcoded) from each to ensure compatibility
 good_cells_brain3_clean <- good_cells_brain3[, c("uid", "good_barcoded")]
 good_cells_brain4_clean <- good_cells_brain4[, c("uid", "good_barcoded")]
