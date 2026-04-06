@@ -35,8 +35,8 @@ render_html() {
   "
 }
 
-render_html 01_your_script.R
-render_html 02_your_script.R
+render_html 2_BARseq_norm_cluster_analyze_brain3.R
+render_html 2_BARseq_norm_cluster_analyze_brain4.R
 # ...
 
 echo "=== Reproducible Run complete. HTML reports saved to /results/ ==="
