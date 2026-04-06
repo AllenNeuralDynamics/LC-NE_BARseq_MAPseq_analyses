@@ -8,7 +8,7 @@ render_html() {
   Rscript -e "
     setup_chunk <- c(
       '#+ setup, echo=FALSE, message=FALSE, warning=FALSE, include=FALSE',
-      'source(\"setup.R\")',
+      'source(\"/code/setup.R\")',
       ''
     )
     lines <- readLines('$script')
