@@ -34,7 +34,7 @@ convert_to_cpm <- function(M, total_counts = 1000000) {
 }
 
 ################## Perform BARseq clustering ##################
-analyze_barseq <- function(barseq, output_name, n_pca = 30, k_umap = 100, k_cluster = 50) {
+analyze_barseq <- function(barseq, output_name, n_pca = 30, k_umap = 100, k_cluster = 50, seed=42) {
   output_dir <- file.path("analysis", make.names(output_name))
   dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
   
@@ -42,7 +42,7 @@ analyze_barseq <- function(barseq, output_name, n_pca = 30, k_umap = 100, k_clus
   barseq <- scater::runUMAP(barseq, dimred = "PCA", n_neighbors = k_umap)
   write_csv(as.data.frame(reducedDim(barseq, "UMAP")), file.path(output_dir, "umap.csv"))
   
-  clusters <- cluster_data(barseq, k_cluster, "jaccard")
+  clusters <- cluster_data(barseq, k_cluster, "jaccard", seed=seed)
   write_csv(clusters, file.path(output_dir, "cluster.csv"))
   
   # create default cluster annotation
@@ -54,12 +54,12 @@ analyze_barseq <- function(barseq, output_name, n_pca = 30, k_umap = 100, k_clus
 }
 
 ################## Cluster data using SNN graph ##################
-cluster_data <- function(barseq, k = 10, type = "rank") {
+cluster_data <- function(barseq, k = 10, type = "rank", seed=42) {
   # type -> "rank" (preservation of neighbor rank),
   # "number" (number of shared neighbors), "jaccard"
   snn <- scran::buildSNNGraph(barseq, k = k, use.dimred = "PCA", type = type,
                               BNPARAM = BiocNeighbors::AnnoyParam(),
-                              BPPARAM = BiocParallel::MulticoreParam(12))
+                              BPPARAM = BiocParallel::MulticoreParam(12, RNGseed = seed))
   label <- igraph::cluster_louvain(snn)$membership
   result <- tibble(sample = colnames(barseq), label)
   return(result)

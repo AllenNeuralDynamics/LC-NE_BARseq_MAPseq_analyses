@@ -341,7 +341,7 @@ print(plot)
 ggsave("LC_cluster_cells_slices.pdf", plot = plot, device = "pdf", width = 20, height = 12)
 
 # Subset out LC-NE proper cells
-LCNE_barseq <- LC_barseq[, colData(LC_barseq)$louvain_cluster %in% c(1, 2, 3)]
+LCNE_barseq <- LC_barseq[, colData(LC_barseq)$louvain_cluster %in% c(1, 3, 4)]
 dim(LCNE_barseq)
 saveRDS(LCNE_barseq, "LCNE_cluster_neurons_CCFv2_uid.rds")
 
@@ -527,8 +527,8 @@ plot <- ggplot(LCNE_barseq_df, aes(x = CCF_ML, y = -CCF_DV, color = louvain_clus
 print(plot)
 ggsave("LCNE_cluster_cells_slices.pdf", plot = plot, device = "pdf", width = 20, height = 12)
 
-# Subset out LC-NE cells excluding the suspect cluster 5 mostly localizing outside NE cell groups
-LCNE_barseq_clusters_filtered <- LCNE_barseq[, colData(LCNE_barseq)$louvain_cluster %in% c(1, 2, 3, 4)]
+# Subset out LC-NE cells excluding the suspect cluster 4 mostly localizing outside NE cell groups
+LCNE_barseq_clusters_filtered <- LCNE_barseq[, colData(LCNE_barseq)$louvain_cluster %in% c(1, 2, 3, 5)]
 dim(LCNE_barseq_clusters_filtered)
 saveRDS(LCNE_barseq_clusters_filtered, "LCNE_clusters_filtered.rds")
 
