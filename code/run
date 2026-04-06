@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 set -euxo pipefail
 
+RSCRIPT="/opt/conda/envs/barseq-r4/bin/Rscript"
+
 render_html() {
   local script="$1"
   local outname
   outname="$(basename "${script%.R}").html"
-  Rscript -e "
+  "$RSCRIPT" -e "
     setup_chunk <- c(
       '#+ setup, echo=FALSE, message=FALSE, warning=FALSE, include=FALSE',
       'source(\"/code/setup.R\")',
