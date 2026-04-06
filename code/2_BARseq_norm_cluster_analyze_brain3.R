@@ -234,9 +234,20 @@ dim(LC_barseq)
 colData(LC_barseq)
 assayNames(LC_barseq)
 
-v<-analyze_barseq(LC_barseq, "barseq_LCcluster_cells")
-new_barseq <- v[[1]]
-clusters <- v[[2]]
+lc_dir <- file.path(BARSEQ_OUTPUT_DIR, "analysis", "barseq_LCcluster_cells")
+if (dir.exists(lc_dir) &&
+    file.exists(file.path(lc_dir, "umap.csv")) &&
+    file.exists(file.path(lc_dir, "cluster.csv"))) {
+  cat("Loading cached results for barseq_LCcluster_cells.\n")
+  clusters <- read.csv(file.path(lc_dir, "cluster.csv"))
+  umap_cached <- read.csv(file.path(lc_dir, "umap.csv"))
+  new_barseq <- LC_barseq
+  reducedDim(new_barseq, "UMAP") <- as.matrix(umap_cached[, c("UMAP1", "UMAP2")])
+} else {
+  v <- analyze_barseq(LC_barseq, "barseq_LCcluster_cells")
+  new_barseq <- v[[1]]
+  clusters <- v[[2]]
+}
 
 #visualize UMAP of samples - set color palette
 n_clusters <- length(unique(clusters[["label"]]))
@@ -341,7 +352,7 @@ print(plot)
 ggsave("LC_cluster_cells_slices.pdf", plot = plot, device = "pdf", width = 20, height = 12)
 
 # Subset out LC-NE proper cells
-LCNE_barseq <- LC_barseq[, colData(LC_barseq)$louvain_cluster %in% c(1, 3, 4)]
+LCNE_barseq <- LC_barseq[, colData(LC_barseq)$louvain_cluster %in% c(1, 2, 3)]
 dim(LCNE_barseq)
 saveRDS(LCNE_barseq, "LCNE_cluster_neurons_CCFv2_uid.rds")
 
@@ -360,9 +371,20 @@ dim(LCNE_barseq)
 colData(LCNE_barseq)
 assayNames(LCNE_barseq)
 
-v<-analyze_barseq(LCNE_barseq, "barseq_LC_NE_cells")
-new_barseq <- v[[1]]
-clusters <- v[[2]]
+lcne_dir <- file.path(BARSEQ_OUTPUT_DIR, "analysis", "barseq_LC_NE_cells")
+if (dir.exists(lcne_dir) &&
+    file.exists(file.path(lcne_dir, "umap.csv")) &&
+    file.exists(file.path(lcne_dir, "cluster.csv"))) {
+  cat("Loading cached results for barseq_LC_NE_cells.\n")
+  clusters <- read.csv(file.path(lcne_dir, "cluster.csv"))
+  umap_cached <- read.csv(file.path(lcne_dir, "umap.csv"))
+  new_barseq <- LCNE_barseq
+  reducedDim(new_barseq, "UMAP") <- as.matrix(umap_cached[, c("UMAP1", "UMAP2")])
+} else {
+  v <- analyze_barseq(LCNE_barseq, "barseq_LC_NE_cells")
+  new_barseq <- v[[1]]
+  clusters <- v[[2]]
+}
 
 #visualize UMAP of samples - set color palette
 n_clusters <- length(unique(clusters[["label"]]))
@@ -528,7 +550,7 @@ print(plot)
 ggsave("LCNE_cluster_cells_slices.pdf", plot = plot, device = "pdf", width = 20, height = 12)
 
 # Subset out LC-NE cells excluding the suspect cluster 4 mostly localizing outside NE cell groups
-LCNE_barseq_clusters_filtered <- LCNE_barseq[, colData(LCNE_barseq)$louvain_cluster %in% c(1, 2, 3, 5)]
+LCNE_barseq_clusters_filtered <- LCNE_barseq[, colData(LCNE_barseq)$louvain_cluster %in% c(1, 2, 3, 4)]
 dim(LCNE_barseq_clusters_filtered)
 saveRDS(LCNE_barseq_clusters_filtered, "LCNE_clusters_filtered.rds")
 
@@ -552,9 +574,20 @@ cols_to_drop <- c("louvain_cluster")
 colData(LCNE) <- colData(LCNE)[, !(colnames(colData(LCNE)) %in% cols_to_drop)]
 
 # Run clustering on the data and save results to a named folder
-v<-analyze_barseq(LCNE, "barseq_LC_NE_clusters_filtered")
-new_barseq <- v[[1]]
-clusters <- v[[2]]
+lcne_filt_dir <- file.path(BARSEQ_OUTPUT_DIR, "analysis", "barseq_LC_NE_clusters_filtered")
+if (dir.exists(lcne_filt_dir) &&
+    file.exists(file.path(lcne_filt_dir, "umap.csv")) &&
+    file.exists(file.path(lcne_filt_dir, "cluster.csv"))) {
+  cat("Loading cached results for barseq_LC_NE_clusters_filtered.\n")
+  clusters <- read.csv(file.path(lcne_filt_dir, "cluster.csv"))
+  umap_cached <- read.csv(file.path(lcne_filt_dir, "umap.csv"))
+  new_barseq <- LCNE
+  reducedDim(new_barseq, "UMAP") <- as.matrix(umap_cached[, c("UMAP1", "UMAP2")])
+} else {
+  v <- analyze_barseq(LCNE, "barseq_LC_NE_clusters_filtered")
+  new_barseq <- v[[1]]
+  clusters <- v[[2]]
+}
 
 #visualize UMAP of samples - set color palette
 n_clusters <- length(unique(clusters[["label"]]))
@@ -905,9 +938,20 @@ cols_to_drop <- c("louvain_cluster", "spatial_coherence_3D_weighted", "spatial_d
 colData(LCNE) <- colData(LCNE)[, !(colnames(colData(LCNE)) %in% cols_to_drop)]
 
 # Run clustering on the data and save results to a named folder
-v<-analyze_barseq(LCNE, "barseq_LC_NE_clusters_filtered_coherence_filtered")
-new_barseq <- v[[1]]
-clusters <- v[[2]]
+lcne_coh_dir <- file.path(BARSEQ_OUTPUT_DIR, "analysis", "barseq_LC_NE_clusters_filtered_coherence_filtered")
+if (dir.exists(lcne_coh_dir) &&
+    file.exists(file.path(lcne_coh_dir, "umap.csv")) &&
+    file.exists(file.path(lcne_coh_dir, "cluster.csv"))) {
+  cat("Loading cached results for barseq_LC_NE_clusters_filtered_coherence_filtered.\n")
+  clusters <- read.csv(file.path(lcne_coh_dir, "cluster.csv"))
+  umap_cached <- read.csv(file.path(lcne_coh_dir, "umap.csv"))
+  new_barseq <- LCNE
+  reducedDim(new_barseq, "UMAP") <- as.matrix(umap_cached[, c("UMAP1", "UMAP2")])
+} else {
+  v <- analyze_barseq(LCNE, "barseq_LC_NE_clusters_filtered_coherence_filtered")
+  new_barseq <- v[[1]]
+  clusters <- v[[2]]
+}
 
 #visualize UMAP of samples - set color palette
 n_clusters <- length(unique(clusters[["label"]]))
