@@ -9,10 +9,19 @@ render_html() {
     # Load all libraries in THIS session
     source('/code/setup.R')
 
-    # Figures go to a temp dir; pandoc --self-contained will embed them as base64
-    fig_dir <- tempfile('figures')
-    dir.create(fig_dir)
-    knitr::opts_chunk\$set(fig.path = paste0(fig_dir, '/fig-'))
+    # Store fig_dir in a protected environment so clear_objects_except_functions()
+    # cannot remove it when it runs inside the knitted script
+    .knitr_state <- new.env(parent = emptyenv())
+    .knitr_state\$fig_dir <- tempfile('figures')
+    dir.create(.knitr_state\$fig_dir)
+
+    knitr::opts_chunk\$set(
+      fig.path   = paste0(.knitr_state\$fig_dir, '/fig-'),
+      fig.width  = 14,
+      fig.height = 10,
+      fig.retina = 2,
+      out.width  = '100%'
+    )
 
     # spin: .R -> .Rmd (text transform only, no execution)
     rmd <- knitr::spin('$script', knit = FALSE, format = 'Rmd')
@@ -25,17 +34,18 @@ render_html() {
       md,
       '-o', '/results/$outname',
       '--standalone',
-      '--self-contained',
+      '--embed-resources',
       '--metadata', 'title=$script'
     ))
 
-    # cleanup
-    unlink(fig_dir, recursive = TRUE)
+    # cleanup — use .knitr_state so fig_dir survives any rm(list=ls()) in the script
+    unlink(.knitr_state\$fig_dir, recursive = TRUE)
     suppressWarnings(file.remove(rmd, md))
   "
 }
 
 render_html 2_BARseq_norm_cluster_analyze_brain3.R
+echo "brain3 exit code: $?"
 render_html 2_BARseq_norm_cluster_analyze_brain4.R
 # ...
 
