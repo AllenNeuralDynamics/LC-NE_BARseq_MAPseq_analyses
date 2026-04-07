@@ -6,11 +6,8 @@ render_html() {
   local outname
   outname="$(basename "${script%.R}").html"
   Rscript -e "
-    # Load all libraries in THIS session
     source('/code/setup.R')
 
-    # Store fig_dir in a protected environment so clear_objects_except_functions()
-    # cannot remove it when it runs inside the knitted script
     .knitr_state <- new.env(parent = emptyenv())
     .knitr_state\$fig_dir <- tempfile('figures')
     dir.create(.knitr_state\$fig_dir)
@@ -23,30 +20,24 @@ render_html() {
       out.width  = '100%'
     )
 
-    # spin: .R -> .Rmd (text transform only, no execution)
-    rmd <- knitr::spin('$script', knit = FALSE, format = 'Rmd')
+    .knitr_state\$rmd <- knitr::spin('$script', knit = FALSE, format = 'Rmd')
+    .knitr_state\$md  <- knitr::knit(.knitr_state\$rmd, quiet = FALSE)
 
-    # knit: .Rmd -> .md, runs IN THIS SESSION (no new R process spawned)
-    md <- knitr::knit(rmd, quiet = FALSE)
-
-    # pandoc: .md -> standalone self-contained HTML
     system2('pandoc', c(
-      md,
+      .knitr_state\$md,
       '-o', '/results/$outname',
       '--standalone',
       '--embed-resources',
       '--metadata', 'title=$script'
     ))
 
-    # cleanup — use .knitr_state so fig_dir survives any rm(list=ls()) in the script
     unlink(.knitr_state\$fig_dir, recursive = TRUE)
-    suppressWarnings(file.remove(rmd, md))
+    suppressWarnings(file.remove(.knitr_state\$rmd, .knitr_state\$md))
   "
 }
 
 render_html 2_BARseq_norm_cluster_analyze_brain3.R
 echo "brain3 exit code: $?"
 render_html 2_BARseq_norm_cluster_analyze_brain4.R
-# ...
 
 echo "=== Reproducible Run complete. HTML reports saved to /results/ ==="
