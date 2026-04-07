@@ -152,7 +152,7 @@ clear_objects_except_functions <- function() {
   })]
   
   # Also keep your directory paths
-  to_keep <- c(to_keep, "BARSEQ_INPUT_DIR", "BARSEQ_OUTPUT_DIR", "BARSEQ_CLUSTERING_DIR")
+  to_keep <- c(to_keep, "BARSEQ_INPUT_DIR", "BARSEQ_OUTPUT_DIR", "BARSEQ_CLUSTERING_DIR", "fig_dir")
   
   to_remove <- setdiff(obj_list, to_keep)
   
