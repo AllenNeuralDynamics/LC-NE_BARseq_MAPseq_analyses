@@ -234,7 +234,7 @@ dim(LC_barseq)
 colData(LC_barseq)
 assayNames(LC_barseq)
 
-lc_dir <- file.path(BARSEQ_OUTPUT_DIR, "analysis", "barseq_LCcluster_cells")
+lc_dir <- file.path(BARSEQ_CLUSTERING_DIR,"barseq_LCcluster_cells")
 if (dir.exists(lc_dir) &&
     file.exists(file.path(lc_dir, "umap.csv")) &&
     file.exists(file.path(lc_dir, "cluster.csv"))) {
@@ -371,7 +371,7 @@ dim(LCNE_barseq)
 colData(LCNE_barseq)
 assayNames(LCNE_barseq)
 
-lcne_dir <- file.path(BARSEQ_OUTPUT_DIR, "analysis", "barseq_LC_NE_cells")
+lcne_dir <- file.path(BARSEQ_CLUSTERING_DIR, "barseq_LC_NE_cells")
 if (dir.exists(lcne_dir) &&
     file.exists(file.path(lcne_dir, "umap.csv")) &&
     file.exists(file.path(lcne_dir, "cluster.csv"))) {
@@ -549,7 +549,7 @@ plot <- ggplot(LCNE_barseq_df, aes(x = CCF_ML, y = -CCF_DV, color = louvain_clus
 print(plot)
 ggsave("LCNE_cluster_cells_slices.pdf", plot = plot, device = "pdf", width = 20, height = 12)
 
-# Subset out LC-NE cells excluding the suspect cluster 4 mostly localizing outside NE cell groups
+# Subset out LC-NE cells excluding the suspect cluster 5 mostly localizing outside NE cell groups
 LCNE_barseq_clusters_filtered <- LCNE_barseq[, colData(LCNE_barseq)$louvain_cluster %in% c(1, 2, 3, 4)]
 dim(LCNE_barseq_clusters_filtered)
 saveRDS(LCNE_barseq_clusters_filtered, "LCNE_clusters_filtered.rds")
@@ -574,7 +574,7 @@ cols_to_drop <- c("louvain_cluster")
 colData(LCNE) <- colData(LCNE)[, !(colnames(colData(LCNE)) %in% cols_to_drop)]
 
 # Run clustering on the data and save results to a named folder
-lcne_filt_dir <- file.path(BARSEQ_OUTPUT_DIR, "analysis", "barseq_LC_NE_clusters_filtered")
+lcne_filt_dir <- file.path(BARSEQ_CLUSTERING_DIR, "barseq_LC_NE_clusters_filtered")
 if (dir.exists(lcne_filt_dir) &&
     file.exists(file.path(lcne_filt_dir, "umap.csv")) &&
     file.exists(file.path(lcne_filt_dir, "cluster.csv"))) {
@@ -759,7 +759,7 @@ clear_objects_except_functions()
 # Load data and stored UMAP info
 LCNE_barseq <- readRDS("LCNE_clusters_filtered_cpm_log_clust.rds")
 
-umap_path <- "/results/BARseq_780345/analysis/barseq_LC_NE_clusters_filtered/umap.csv"
+umap_path <- file.path(BARSEQ_CLUSTERING_DIR, "barseq_LC_NE_clusters_filtered", "umap.csv")
 umap_df <- read.csv(umap_path, header = TRUE)
 
 #Compute kNN-based cluster purity: proportion of same-cluster neighbors.
@@ -938,7 +938,7 @@ cols_to_drop <- c("louvain_cluster", "spatial_coherence_3D_weighted", "spatial_d
 colData(LCNE) <- colData(LCNE)[, !(colnames(colData(LCNE)) %in% cols_to_drop)]
 
 # Run clustering on the data and save results to a named folder
-lcne_coh_dir <- file.path(BARSEQ_OUTPUT_DIR, "analysis", "barseq_LC_NE_clusters_filtered_coherence_filtered")
+lcne_coh_dir <- file.path(BARSEQ_CLUSTERING_DIR, "barseq_LC_NE_clusters_filtered_coherence_filtered")
 if (dir.exists(lcne_coh_dir) &&
     file.exists(file.path(lcne_coh_dir, "umap.csv")) &&
     file.exists(file.path(lcne_coh_dir, "cluster.csv"))) {
