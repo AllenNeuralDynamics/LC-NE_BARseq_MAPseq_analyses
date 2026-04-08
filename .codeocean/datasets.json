@@ -1,0 +1,45 @@
+{
+	"version": 1,
+	"attached_datasets": [
+		{
+			"id": "0e3f1b4f-2f63-4692-acfe-1411d3f44e25",
+			"mount": "BARseq_780346_analysis_clustering"
+		},
+		{
+			"id": "546c49f5-56c0-45fa-9787-6582332482a5",
+			"mount": "BARseq_780345-780346_combined_analysis_clustering"
+		},
+		{
+			"id": "72096ec2-0e65-4373-9bd4-0bf163dfe4bd",
+			"mount": "BARseq_MATtoRDSfiles_brain3_brain4"
+		},
+		{
+			"id": "80538a79-932f-4ee1-88a9-20a4c0f54662",
+			"mount": "BARseq_soma_barcodes"
+		},
+		{
+			"id": "8b374817-d010-4c72-92f7-de9737905f3b",
+			"mount": "BARseq_MATtoRDSfiles_brain1"
+		},
+		{
+			"id": "95dbe512-bcf8-4f68-9947-0fb99320f3b4",
+			"mount": "780345_2025-02-20_00-00-00"
+		},
+		{
+			"id": "9e7eda3c-c668-4c28-abcc-886080217215",
+			"mount": "BARseq_669594_analysis_clustering"
+		},
+		{
+			"id": "a78668f6-3451-42d4-9a83-d88f6884e83d",
+			"mount": "BARseq_780345_analysis_clustering"
+		},
+		{
+			"id": "b60463ab-6d8b-4b0f-9074-5a579e22b037",
+			"mount": "MAPseq_ROI_info"
+		},
+		{
+			"id": "d182e926-84f8-42b7-ac7c-ba712f1dd971",
+			"mount": "780346_2025-06-11_00-00-00"
+		}
+	]
+}

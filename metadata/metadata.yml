@@ -1,5 +1,5 @@
 metadata_version: 1
-name: PK_BARseq_MAPseq_LC-NE_for_release
+name: LC-NE_BARseq_MAPseq_analyses
 description: Analyses of BARseq and MAPseq data for LC-NE manuscript
 authors:
 - name: Polina Kosillo
