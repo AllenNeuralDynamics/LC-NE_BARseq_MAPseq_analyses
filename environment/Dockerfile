@@ -4,7 +4,7 @@ FROM $REGISTRY_HOST/codeocean/c2-seurat:latest
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG GIT_ASKPASS
-COPY git-askpass /
+COPY git-ask-pass /
 
 RUN mamba install -y \
         r-base==4.3.0 \
