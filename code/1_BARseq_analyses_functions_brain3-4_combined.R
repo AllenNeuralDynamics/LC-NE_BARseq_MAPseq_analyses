@@ -59,7 +59,7 @@ cluster_data <- function(barseq, k = 10, type = "rank", seed=42) {
   # "number" (number of shared neighbors), "jaccard"
   snn <- scran::buildSNNGraph(barseq, k = k, use.dimred = "PCA", type = type,
                               BNPARAM = BiocNeighbors::AnnoyParam(),
-                              BPPARAM = BiocParallel::MulticoreParam(12, RNGseed = seed)
+                              BPPARAM = BiocParallel::MulticoreParam(12, RNGseed = seed))
   label <- igraph::cluster_louvain(snn)$membership
   result <- tibble(sample = colnames(barseq), label)
   return(result)

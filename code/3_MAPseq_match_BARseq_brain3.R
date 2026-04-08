@@ -58,14 +58,10 @@ colData(LCNEcluster)
 table(colData(LCNEcluster)$barcode)
 table(colData(LCNEcluster)$louvain_cluster)
 
-# LCNEneurons <-readRDS("LCNE_neurons_CCFv2_uid_cpm_log_clust.rds") - least conservative
-# LCNEneurons_clustfilt <-readRDS("LCNE_clusters_filtered_cpm_log_clust.rds")
-# LCNEneurons_clustfilt_spatialfilt <-readRDS("LCNE_clusters_filtered_coherence_filtered_cpm_log_clust.rds") - most conservative
-
 ############################################################################################################################################################################################################
 # Process barcode information for all barcoded cells from BARseq experiment and convert them to MAPseq basecalls format
 # Read CSV without column names, and name columns manually
-barcodes_raw <- read_csv("barcodes_BC_qc.csv", col_names = FALSE)
+barcodes_raw <- read_csv("/data/BARseq_soma_barcodes/barcodes_BC_qc_780345.csv", col_names = FALSE)
 # Rename for clarity
 colnames(barcodes_raw)[1] <- "CellID"
 colnames(barcodes_raw)[2:16] <- paste0("B", 1:15)  # Barcode positions
@@ -379,7 +375,7 @@ print_and_save_duplicates(result_2, proj_2_nodup, "proj_2_duplicated_rows.csv")
 #####################################################################################################################################################################################
 # Only retain cells for genes vs projections processing which pass visual QC
 # Load visual QC info CSV 
-visualQC <- read.csv("LC_visualQC_barcoded_cells.csv", header = TRUE, stringsAsFactors = FALSE)
+visualQC <- read.csv("/data/BARseq_soma_barcodes/LC_visualQC_barcoded_cells_780345.csv", header = TRUE, stringsAsFactors = FALSE)
 # Check that the 'uid' column exists
 if (!"uid" %in% colnames(visualQC)) {
   stop("No 'uid' column found in LC_visualQC_barcoded_cells.csv")
@@ -504,7 +500,7 @@ real_ties_counts <- c(
   dplyr::n_distinct(res_3$dropped_ties$CellID)
 )
 
-# Random Simulations (use a NEW filename; old file was pre-resolver format)
+# Random Simulations
 random_sim_file <- "random_simulation_results_resolved.rds"
 if (file.exists(random_sim_file)) {
   random_results <- readRDS(random_sim_file)
@@ -523,7 +519,7 @@ random_mean_ties <- random_summary$ties_means
 # Calculate Error Rates (FPR for being selected)
 error_rates_selected <- calculate_error_rates(random_mean_selected, n_barseq)
 
-# Construct comparison_df (RANDOM)
+# Construct comparison_df
 comparison_df <- data.frame(
   Mismatches = 0:max_mismatches,
   Real_Selected = real_selected_counts,
@@ -552,7 +548,7 @@ print(p)
 ggsave("BarSeq-MapSeq_FPR_resolved.pdf", plot = p, device = "pdf", width = 6, height = 6)
 
 #####################################################################################################################################################################################
-# Shuffled BarSeq Data Simulation for FPR estimation (UPDATED for resolve_best_unique)
+# Shuffled BarSeq Data Simulation for FPR estimation
 # Function to shuffle barcode keeping 9th nucleotide fixed
 shuffle_barcode <- function(vbc) {
   chars <- strsplit(vbc, "")[[1]]

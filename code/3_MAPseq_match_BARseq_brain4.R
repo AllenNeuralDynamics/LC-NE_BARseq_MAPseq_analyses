@@ -61,7 +61,7 @@ table(colData(LCNEcluster)$louvain_cluster)
 ############################################################################################################################################################################################################
 # Process barcode information for all barcoded cells from BARseq experiment and convert them to MAPseq basecalls format
 # Read CSV without column names, and name columns manually
-barcodes_raw <- read_csv("barcodes_LC_subset_good_cells.csv", col_names = TRUE)
+barcodes_raw <- read_csv("/data/BARseq_soma_barcodes/barcodes_BC_qc_780346.csv", col_names = FALSE)
 # Rename for clarity
 colnames(barcodes_raw)[1] <- "CellID"
 colnames(barcodes_raw)[2:16] <- paste0("B", 1:15)  # Barcode positions
@@ -373,35 +373,35 @@ print_and_save_duplicates(result_0, proj_0_nodup, "proj_0_duplicated_rows.csv")
 print_and_save_duplicates(result_1, proj_1_nodup, "proj_1_duplicated_rows.csv")
 print_and_save_duplicates(result_2, proj_2_nodup, "proj_2_duplicated_rows.csv")
 
-# #####################################################################################################################################################################################
-# # Only retain cells for genes vs projections processing which pass visual QC
-# # Load visual QC info CSV 
-# visualQC <- read.csv("LC_visualQC_barcoded_cells.csv", header = TRUE, stringsAsFactors = FALSE)
-# # Check that the 'uid' column exists
-# if (!"uid" %in% colnames(visualQC)) {
-#   stop("No 'uid' column found in LC_visualQC_barcoded_cells.csv")
-# }
-# 
-# # Get the list of uids where good_barcoded is TRUE
-# good_uids <- visualQC$uid[visualQC$good_barcoded == 1]
-# length(good_uids)
-# # Subset cells for analyses involving gene expression profiles plus projections
-# proj_0_GENES <- proj_0_nodup[proj_0_nodup$CellID %in% good_uids, ]
-# dim(proj_0_GENES)
-# result_0_GENES <- check_duplicates(proj_0_GENES)
-# 
-# proj_1_GENES <- proj_1_nodup[proj_1_nodup$CellID %in% good_uids, ]
-# dim(proj_1_GENES)
-# result_1_GENES <- check_duplicates(proj_1_GENES)
-# 
-# proj_2_GENES <- proj_2_nodup[proj_2_nodup$CellID %in% good_uids, ]
-# dim(proj_2_GENES)
-# result_2_GENES <- check_duplicates(proj_2_GENES)
-# 
-# # Save
-# write_csv(proj_0_GENES, "MapSeq_matched_projections_exact_GENES.csv")
-# write_csv(proj_1_GENES, "MapSeq_matched_projections_1_mismatch_GENES.csv")
-# write_csv(proj_2_GENES, "MapSeq_matched_projections_2_mismatch_GENES.csv")
+#####################################################################################################################################################################################
+# Only retain cells for genes vs projections processing which pass visual QC
+# Load visual QC info CSV
+visualQC <- read.csv("/data/BARseq_soma_barcodes/LC_visualQC_barcoded_cells_780346.csv", header = TRUE, stringsAsFactors = FALSE)
+# Check that the 'uid' column exists
+if (!"uid" %in% colnames(visualQC)) {
+  stop("No 'uid' column found in LC_visualQC_barcoded_cells.csv")
+}
+
+# Get the list of uids where good_barcoded is TRUE
+good_uids <- visualQC$uid[visualQC$good_barcoded == 1]
+length(good_uids)
+# Subset cells for analyses involving gene expression profiles plus projections
+proj_0_GENES <- proj_0_nodup[proj_0_nodup$CellID %in% good_uids, ]
+dim(proj_0_GENES)
+result_0_GENES <- check_duplicates(proj_0_GENES)
+
+proj_1_GENES <- proj_1_nodup[proj_1_nodup$CellID %in% good_uids, ]
+dim(proj_1_GENES)
+result_1_GENES <- check_duplicates(proj_1_GENES)
+
+proj_2_GENES <- proj_2_nodup[proj_2_nodup$CellID %in% good_uids, ]
+dim(proj_2_GENES)
+result_2_GENES <- check_duplicates(proj_2_GENES)
+
+# Save
+write_csv(proj_0_GENES, "MapSeq_matched_projections_exact_GENES.csv")
+write_csv(proj_1_GENES, "MapSeq_matched_projections_1_mismatch_GENES.csv")
+write_csv(proj_2_GENES, "MapSeq_matched_projections_2_mismatch_GENES.csv")
 
 
 #####################################################################################################################################################################################
@@ -645,3 +645,4 @@ p_shuf <- ggplot(shuffled_comparison_df, aes(x = Mismatches, y = Avg_Shuffled_Se
   theme_minimal()
 print(p_shuf)
 ggsave("BarSeq-MapSeq_Shuffled_FPR_resolved.pdf", plot = p_shuf, device = "pdf", width = 6, height = 6)
+

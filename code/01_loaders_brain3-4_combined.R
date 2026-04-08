@@ -48,7 +48,7 @@ load_data_brain3 <-function() {
   cell_metadata <- as.data.frame(colData(LCNEneurons))
   
   # Load sample information
-  proj_index <- readr::read_tsv("sampleinfo.tsv")
+  proj_index <- readr::read_tsv("/data/MAPseq_ROI_info/sampleinfo_780345.tsv")
   head(proj_index)
   sampleinfo <- read_excel("/data/780345_2025-02-20_00-00-00/MAPseq/M295_20250729_USEthis/M295_20250721.sampleinfo.xlsx", sheet = "Sample information", skip = 1, range = "A2:G110")
   head(sampleinfo)
@@ -450,7 +450,7 @@ load_data_brain4 <-function() {
   # Load sample information
   proj_index <- read_tsv("/data/780346_2025-06-11_00-00-00/MAPseq/M305_20251030_USEthis/M305sampleinfo.tsv")
   head(proj_index)
-  sampleinfo <- read_excel("./M305_sample_information.xlsx", sheet = "Sample information", skip = 1,range = "A2:J122")
+  sampleinfo <- read_excel("/data/MAPseq_ROI_info/sampleinfo_780346.xlsx", sheet = "Sample information", skip = 1,range = "A2:J122")
   head(sampleinfo)
   colnames(sampleinfo) <- c("usertube", "ourtube", "samplename", "siteinfo", "QC_qPCR", "rtprimer", "brain", "hemisphere", "ROI", "notes")
   

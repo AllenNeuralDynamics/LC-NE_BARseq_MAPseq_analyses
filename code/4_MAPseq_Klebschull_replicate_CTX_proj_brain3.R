@@ -12,7 +12,7 @@ LCNEneurons <- readRDS("LCNE_clusters_filtered_coherence_filtered_cpm_log_clust.
 colData(LCNEneurons)
 cell_metadata <- as.data.frame(colData(LCNEneurons))
 
-proj_index <- read_tsv("sampleinfo.tsv")
+proj_index <- read_tsv("/data/MAPseq_ROI_info/sampleinfo_780345.tsv")
 head(proj_index)
 sampleinfo <- read_excel("/data/780345_2025-02-20_00-00-00/MAPseq/M295_20250729_USEthis/M295_20250721.sampleinfo.xlsx", sheet = "Sample information")
 head(sampleinfo)
@@ -575,7 +575,7 @@ write.csv(sanity_table, "duplicate_positions_sanity_table.csv", row.names = FALS
 # QC + transcriptomic metrics for duplicate groups (VBC groups; includes mapped MAPseq hash ID)
 ####################################################################################################
 # Load segmentation QC data
-good_cells <- read.csv("LC_visualQC_barcoded_cells.csv", stringsAsFactors = FALSE)
+good_cells <- read.csv("/data/BARseq_soma_barcodes/LC_visualQC_barcoded_cells_780345.csv", stringsAsFactors = FALSE)
 # Standardize uid column as character (safer joins)
 good_cells$uid <- as.character(good_cells$uid)
 good_uids <- good_cells$uid[good_cells$good_barcoded == 1]
@@ -1288,3 +1288,4 @@ text(x = par("usr")[1] - offset * diff(par("usr")[1:2]), y = 55, labels = "botto
 mtext("Row-normalized, log1p, max-normalized", side = 1, line = 4, cex = 1)
 dev.copy(pdf, "top_bottom_innervated_areas_by_norm_method.pdf", width = 12, height = 8)
 dev.off()
+
