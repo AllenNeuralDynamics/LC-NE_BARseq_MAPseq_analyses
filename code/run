@@ -38,11 +38,17 @@ render_html() {
 
 render_html 2_BARseq_norm_cluster_analyze_brain3.R
 echo "brain3 BARseq exit code: $?"
+# TEMP-SKIP — fast-iteration mode for input-swap PR validation. Brain3 only. Restore (delete the `if false; then` and matching `fi`) before merge.
+if false; then
 render_html 2_BARseq_norm_cluster_analyze_brain4.R
 echo "brain4 BARseq exit code: $?"
+fi
 
 render_html 3_MAPseq_match_BARseq_brain3.R
 echo "brain3 MAPseq match exit code: $?"
+
+# TEMP-SKIP — fast-iteration mode for input-swap PR validation. Brain3 only. Restore (delete the `if false; then` and matching `fi`) before merge.
+if false; then
 render_html 3_MAPseq_match_BARseq_brain4.R
 echo "brain4 MAPseq match exit code: $?"
 
@@ -64,6 +70,7 @@ render_html 6_MAPseq_ExA-SPIM_brain4.R
 echo "brain4 MAPseq ExA plots exit code: $?"
 render_html 6_MAPseq_ExA-SPIM_brain3-4_combined.R
 echo "brain3-4 combined MAPseq ExA plots exit code: $?"
+fi
 
 # TEMP — remove before merge along with TEMP_validate_against_reference.R and the reference data asset.
 render_html TEMP_validate_against_reference.R
