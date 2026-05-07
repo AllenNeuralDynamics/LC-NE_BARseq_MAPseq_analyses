@@ -1,0 +1,39 @@
+# Conda environment for the LC-NE BARseq/MAPseq analyses. Lists the R
+# packages used by the capsule's scripts; transitive deps resolve
+# automatically.
+name: barseq-r4
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - r-base=4.3.0
+  - r-matrix=1.6_5
+  - r-reticulate=1.28
+  - r-tidyverse
+  - r-seurat
+  - r-seuratobject
+  - r-sctransform
+  - r-clustree
+  - r-viridis
+  - r-gplots
+  - r-pheatmap
+  - r-fnn
+  - r-patchwork
+  - r-rcolorbrewer
+  - r-readxl
+  - r-digest
+  - r-proxy
+  - r-matrixstats
+  - r-doparallel
+  - r-cowplot
+  - r-ggrepel
+  - r-gridextra
+  - r-irlba
+  - bioconductor-singlecellexperiment
+  - bioconductor-metaneighbor
+  - bioconductor-scater
+  - bioconductor-scran
+  - bioconductor-biocparallel
+  - bioconductor-biocneighbors
+  - bioconductor-limma
+  - bioconductor-edger
