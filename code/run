@@ -65,4 +65,8 @@ echo "brain4 MAPseq ExA plots exit code: $?"
 render_html 6_MAPseq_ExA-SPIM_brain3-4_combined.R
 echo "brain3-4 combined MAPseq ExA plots exit code: $?"
 
+# TEMP — remove before merge along with TEMP_validate_against_reference.R and the reference data asset.
+render_html TEMP_validate_against_reference.R
+echo "validation exit code: $?"
+
 echo "=== Reproducible Run complete. HTML reports saved to /results/ ==="
