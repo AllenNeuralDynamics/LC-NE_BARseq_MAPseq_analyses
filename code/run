@@ -36,10 +36,6 @@ render_html() {
   "
 }
 
-# TEMP — env-build smoketest mode for the first PR2 build. Wraps the pipeline in `if false` so only the env build + library-load test runs. Restore (delete the smoketest line, this comment, and the matching `if false; then` and `fi` markers below) once the env is verified.
-Rscript -e "source('/code/setup.R'); cat('env smoketest OK\n')"
-
-if false; then
 render_html 2_BARseq_norm_cluster_analyze_brain3.R
 echo "brain3 BARseq exit code: $?"
 render_html 2_BARseq_norm_cluster_analyze_brain4.R
@@ -74,6 +70,5 @@ echo "brain3-4 combined MAPseq ExA plots exit code: $?"
 # Run as plain Rscript with stdout to a .md file — easier to copy than the HTML render_html produces.
 Rscript -e "source('/code/setup.R'); source('/code/TEMP_validate_against_reference.R')" > /results/TEMP_validate_against_reference.md 2>&1
 echo "validation exit code: $?"
-fi
 
 echo "=== Reproducible Run complete. HTML reports saved to /results/ ==="
