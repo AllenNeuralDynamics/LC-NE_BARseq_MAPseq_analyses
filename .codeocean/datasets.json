@@ -18,10 +18,6 @@
 			"mount": "BARseq_780345-780346_combined_analysis_clustering"
 		},
 		{
-			"id": "72096ec2-0e65-4373-9bd4-0bf163dfe4bd",
-			"mount": "BARseq_MATtoRDSfiles_brain3_brain4"
-		},
-		{
 			"id": "80538a79-932f-4ee1-88a9-20a4c0f54662",
 			"mount": "BARseq_soma_barcodes"
 		},
