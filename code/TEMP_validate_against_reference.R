@@ -1,12 +1,3 @@
-#' # Validate analysis outputs against the released-capsule reference
-#'
-#' TEMP — remove before merge. Confirms the input-asset swap did not change any
-#' output of the pipeline. Compares everything written to `/results/` by this run
-#' against the released-capsule outputs (frozen as the reference asset).
-#'
-#' Strict comparison: `identical()` on RDS objects and parsed CSV/TSV. Visual
-#' files (HTML, PDF) are skipped — eyeball those side-by-side instead.
-
 suppressPackageStartupMessages({
   library(SingleCellExperiment)
 })
@@ -17,7 +8,14 @@ NEW_ROOT <- "/results"
 stopifnot(dir.exists(OLD_ROOT))
 stopifnot(dir.exists(NEW_ROOT))
 
-#' ## File-by-file comparison
+cat("# Validate analysis outputs against the released-capsule reference\n\n")
+cat("TEMP — remove before merge. Confirms the input-asset swap did not change any output of the pipeline. ")
+cat("Compares everything written to `/results/` by this run against the released-capsule outputs ")
+cat("(frozen as the reference asset).\n\n")
+cat("Strict comparison: `identical()` on RDS objects and parsed CSV/TSV. ")
+cat("Visual files (HTML, PDF) are skipped — eyeball those side-by-side instead.\n\n")
+
+cat("## File-by-file comparison\n\n")
 
 ref_files <- list.files(OLD_ROOT, recursive = TRUE, full.names = FALSE)
 new_files <- list.files(NEW_ROOT, recursive = TRUE, full.names = FALSE)
@@ -110,9 +108,8 @@ for (rel in extras) {
 }
 n_extra <- length(extras)
 
-#' ## Summary
-
-cat("\n========================\n")
+cat("\n## Summary\n\n")
+cat("========================\n")
 cat(sprintf("RDS   matching: %d   differing: %d\n", n_match_rds, n_diff_rds))
 cat(sprintf("CSV   matching: %d   differing: %d\n", n_match_csv, n_diff_csv))
 cat(sprintf("TSV   matching: %d   differing: %d\n", n_match_tsv, n_diff_tsv))
@@ -128,10 +125,8 @@ if (n_diverged == 0) {
   cat(sprintf("\n%d FILE(S) DIVERGE — see [DIFF] / MISSING / EXTRA lines above.\n", n_diverged))
 }
 
-#' ## Dbh / Th per-cell expression spot-check
-#'
-#' Drill into the per-cohort post-normalization SCEs and compare counts for the
-#' two genes Polina checks first.
+cat("\n## Dbh / Th per-cell expression spot-check\n\n")
+cat("Drill into the per-cohort post-normalization SCEs and compare counts for the two genes Polina checks first.\n\n")
 
 for (cohort in c("BARseq_780345", "BARseq_780346", "BARseq_780345-780346_combined")) {
   rel <- file.path(cohort, "combined_neurons_clust_CCFv2_uid_cpm_log.rds")
