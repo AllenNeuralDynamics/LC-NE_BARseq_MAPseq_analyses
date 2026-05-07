@@ -1,3 +1,6 @@
+MAPSEQ_INPUT_DIR_780345 <- '/data/mapseq_780345_2025-03-24_12-00-00/MAPseq/M295_20250729_USEthis/'
+MAPSEQ_INPUT_DIR_780346 <- '/data/mapseq_780346_2025-07-23_12-00-00/MAPseq/M305_20251030_USEthis/'
+
 # Loader function for brain #3 and brain #4 MAPseq data where each dataset gets pre-processed and normalized, and then combined into one
 # ROI order is indexed by slide it was collected from to enhance compatibility across datasets and lost samples
 
@@ -50,7 +53,7 @@ load_data_brain3 <-function() {
   # Load sample information
   proj_index <- readr::read_tsv("/data/MAPseq_ROI_info/sampleinfo_780345.tsv")
   head(proj_index)
-  sampleinfo <- read_excel("/data/780345_2025-02-20_00-00-00/MAPseq/M295_20250729_USEthis/M295_20250721.sampleinfo.xlsx", sheet = "Sample information", skip = 1, range = "A2:G110")
+  sampleinfo <- read_excel(file.path(MAPSEQ_INPUT_DIR_780345, "M295_20250721.sampleinfo.xlsx"), sheet = "Sample information", skip = 1, range = "A2:G110")
   head(sampleinfo)
   colnames(sampleinfo) <- c("usertube", "ourtube", "samplename", "siteinfo", "QC_qPCR", "rtprimer", "brain")
   proj_index$MapSeqV1_tube <- sampleinfo$rtprimer[match(proj_index$usertube, sampleinfo$usertube)]
@@ -448,7 +451,7 @@ load_data_brain4 <-function() {
   cell_metadata <- as.data.frame(colData(LCNEneurons))
   
   # Load sample information
-  proj_index <- read_tsv("/data/780346_2025-06-11_00-00-00/MAPseq/M305_20251030_USEthis/M305sampleinfo.tsv")
+  proj_index <- read_tsv(file.path(MAPSEQ_INPUT_DIR_780346, "M305sampleinfo.tsv"))
   head(proj_index)
   sampleinfo <- read_excel("/data/MAPseq_ROI_info/sampleinfo_780346.xlsx", sheet = "Sample information", skip = 1,range = "A2:J122")
   head(sampleinfo)

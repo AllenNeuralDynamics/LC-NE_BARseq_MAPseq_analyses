@@ -2,13 +2,15 @@
 # Performs converts BARseq barcodes to MAPseq format, truncates MAPseq 32nt barcodes to 15nt to match BARseq barcode length
 # Identifies uniquely barcoded BARseq cells which have a match in the MAPseq dataset with 0,1,2,or 3 Hamming distance mismatches allowed
 
+MAPSEQ_INPUT_DIR <- '/data/mapseq_780345_2025-03-24_12-00-00/MAPseq/M295_20250729_USEthis/'
+
 #set working directory 
 setwd('/results/BARseq_780345/')
 ############################################################################################################################################################################################################
 # Sanity checks for QC of the MAPseq data
-UMI_filt <- read_tsv("/data/780345_2025-02-20_00-00-00/MAPseq/M295_20250729_USEthis/780345.nbcm.tsv")
-UMI_raw <- read_tsv("/data/780345_2025-02-20_00-00-00/MAPseq/M295_20250729_USEthis/780345.rbcm.tsv")
-UMI_spikein <- read_tsv("/data/780345_2025-02-20_00-00-00/MAPseq/M295_20250729_USEthis/780345.sbcm.tsv")
+UMI_filt <- read_tsv(file.path(MAPSEQ_INPUT_DIR, "780345.nbcm.tsv"))
+UMI_raw <- read_tsv(file.path(MAPSEQ_INPUT_DIR, "780345.rbcm.tsv"))
+UMI_spikein <- read_tsv(file.path(MAPSEQ_INPUT_DIR, "780345.sbcm.tsv"))
 
 # Process all three datasets
 UMI_filt <- UMI_filt %>%
@@ -97,7 +99,7 @@ rm(barcodes_raw, barseq_nuc)
 barseq <- LC_barcoded_cells
 
 # MapSeq input, truncate to first 15 characters to ensure that vector legnth is equivalent to BarSeq 15 cycles
-mapseq <- read_tsv("/data/780345_2025-02-20_00-00-00/MAPseq/M295_20250729_USEthis/780345.nbcm.tsv")
+mapseq <- read_tsv(file.path(MAPSEQ_INPUT_DIR, "780345.nbcm.tsv"))
 
 # Find which columns are logical (shouldn't be)
 logical_cols <- sapply(mapseq, is.logical)

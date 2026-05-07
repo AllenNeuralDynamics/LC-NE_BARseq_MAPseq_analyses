@@ -1,3 +1,5 @@
+MAPSEQ_INPUT_DIR <- '/data/mapseq_780346_2025-07-23_12-00-00/MAPseq/M305_20251030_USEthis/'
+
 # Function to pre-process and load the data in a format directly usable by downstream analyses
 load_data <-function() {
 
@@ -36,7 +38,7 @@ load_data <-function() {
   cell_metadata <- as.data.frame(colData(LCNEneurons))
   
   # Load sample information
-  proj_index <- read_tsv("/data/780346_2025-06-11_00-00-00/MAPseq/M305_20251030_USEthis/M305sampleinfo.tsv")
+  proj_index <- read_tsv(file.path(MAPSEQ_INPUT_DIR, "M305sampleinfo.tsv"))
   head(proj_index)
   sampleinfo <- read_excel("/data/MAPseq_ROI_info/sampleinfo_780346.xlsx", sheet = "Sample information", skip = 1,range = "A2:J122")
   head(sampleinfo)
