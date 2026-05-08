@@ -1,15 +1,16 @@
-FROM registry.codeocean.allenneuraldynamics.org/codeocean/c2-seurat:latest
+# hash:sha256:ed427fb9cb4bf670ddcf31adbaf6cc4a91eec73fdd14d9fe8dd3ed6ab7ef62ea
+ARG REGISTRY_HOST
+FROM $REGISTRY_HOST/codeocean/c2-seurat:latest
+
 ARG DEBIAN_FRONTEND=noninteractive
 ARG GIT_ASKPASS
-ARG GIT_ACCESS_TOKEN
 COPY git-ask-pass /
-COPY barseq-r4.yml /etc/mamba-envs/barseq-r4.yml
 
-# Build the barseq-r4 R conda environment.
-# The `|| true` on the mamba update line lets the build continue if
-# mamba's self-update fails -- the rest of the build doesn't depend on it.
+COPY barseq-r4.yml /tmp/barseq-r4.yml
+
 RUN mamba update -n base -c conda-forge mamba libsolv -y || true \
- && rm -rf /opt/conda/envs/barseq-r4 \
- && mamba env create -f /etc/mamba-envs/barseq-r4.yml \
+ && rm -rf /opt/conda/envs/* /etc/mamba-envs/* \
+ && mamba env create -f /tmp/barseq-r4.yml \
+ && rm /tmp/barseq-r4.yml \
  && echo "/opt/conda/envs/barseq-r4/lib" > /etc/ld.so.conf.d/barseq-r4.conf \
  && ldconfig
