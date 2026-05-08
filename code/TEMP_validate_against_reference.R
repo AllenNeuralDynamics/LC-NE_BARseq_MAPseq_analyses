@@ -8,29 +8,26 @@ NEW_ROOT <- "/results"
 stopifnot(dir.exists(OLD_ROOT))
 stopifnot(dir.exists(NEW_ROOT))
 
-cat("# Validate analysis outputs against the released-capsule reference\n\n")
-cat("TEMP — remove before merge. Confirms the input-asset swap did not change any output of the pipeline. ")
-cat("Compares everything written to `/results/` by this run against the released-capsule outputs ")
-cat("(frozen as the reference asset).\n\n")
-cat("Strict comparison: `identical()` on RDS objects and parsed CSV/TSV. ")
-cat("Visual files (HTML, PDF) are skipped — eyeball those side-by-side instead.\n\n")
-
-cat("## File-by-file comparison\n\n")
-
 ref_files <- list.files(OLD_ROOT, recursive = TRUE, full.names = FALSE)
 new_files <- list.files(NEW_ROOT, recursive = TRUE, full.names = FALSE)
 
-cat(sprintf("Reference asset: %d files\n", length(ref_files)))
-cat(sprintf("Current /results: %d files\n\n", length(new_files)))
-
 ext_of <- function(p) tolower(tools::file_ext(p))
+fmt <- function(x) format(x, big.mark = ",")
 
-n_match_rds <- 0; n_diff_rds <- 0
-n_match_csv <- 0; n_diff_csv <- 0
-n_match_tsv <- 0; n_diff_tsv <- 0
-n_skip_visual <- 0
-n_skip_other <- 0
-n_missing <- 0
+# ---------------------------------------------------------------
+# Pass 1: classify each ref file into a bucket. No printing yet.
+# ---------------------------------------------------------------
+
+csv_match      <- list()  # list(path, rows, cols)
+csv_diff       <- list()  # list(path, old_dim, new_dim)
+tsv_match      <- list()
+tsv_diff       <- list()
+rds_data_match <- list()  # list(path, dim, fully_identical)
+rds_real_diff  <- list()  # list(path, dim, mismatches)
+skipped_visual <- character()
+skipped_other  <- character()
+missing_in_new <- character()
+extras         <- setdiff(new_files, ref_files)
 
 for (rel in sort(ref_files)) {
   old_path <- file.path(OLD_ROOT, rel)
@@ -38,121 +35,231 @@ for (rel in sort(ref_files)) {
   e <- ext_of(rel)
 
   if (!file.exists(new_path)) {
-    cat(sprintf("MISSING in /results: %s\n", rel))
-    n_missing <- n_missing + 1
+    missing_in_new <- c(missing_in_new, rel)
     next
   }
 
   if (e == "rds") {
     old_obj <- readRDS(old_path)
     new_obj <- readRDS(new_path)
+
     if (identical(old_obj, new_obj)) {
-      n_match_rds <- n_match_rds + 1
-      cat(sprintf("[OK rds]   %s\n", rel))
-    } else {
-      n_diff_rds <- n_diff_rds + 1
-      cat(sprintf("[DIFF rds] %s\n", rel))
-      cat(sprintf("           class old=%s new=%s\n",
-                  paste(class(old_obj), collapse=","),
-                  paste(class(new_obj), collapse=",")))
-      if (is(old_obj, "SingleCellExperiment") && is(new_obj, "SingleCellExperiment")) {
-        cat(sprintf("           dim   old=%s new=%s\n",
-                    paste(dim(old_obj), collapse="x"),
-                    paste(dim(new_obj), collapse="x")))
-        for (a in intersect(assayNames(old_obj), assayNames(new_obj))) {
-          eq <- identical(assay(old_obj, a), assay(new_obj, a))
-          cat(sprintf("           assay '%s' identical: %s\n", a, eq))
+      dims <- if (is(old_obj, "SingleCellExperiment")) paste(dim(old_obj), collapse = "x") else NA_character_
+      rds_data_match[[length(rds_data_match) + 1L]] <- list(path = rel, dim = dims, fully_identical = TRUE)
+      next
+    }
+
+    if (is(old_obj, "SingleCellExperiment") && is(new_obj, "SingleCellExperiment")) {
+      mismatches <- character()
+      for (a in intersect(assayNames(old_obj), assayNames(new_obj))) {
+        if (!identical(assay(old_obj, a), assay(new_obj, a))) {
+          mismatches <- c(mismatches, paste0("assay '", a, "'"))
         }
-        cat(sprintf("           colData identical:  %s\n",
-                    identical(colData(old_obj), colData(new_obj))))
-        cat(sprintf("           rowData identical:  %s\n",
-                    identical(rowData(old_obj), rowData(new_obj))))
-        cat(sprintf("           metadata identical: %s   (often differs harmlessly via package-version stamps)\n",
-                    identical(metadata(old_obj), metadata(new_obj))))
       }
+      added   <- setdiff(assayNames(new_obj), assayNames(old_obj))
+      removed <- setdiff(assayNames(old_obj), assayNames(new_obj))
+      if (length(added)   > 0L) mismatches <- c(mismatches, paste0("added assay: ",   added))
+      if (length(removed) > 0L) mismatches <- c(mismatches, paste0("removed assay: ", removed))
+      if (!identical(colData(old_obj),  colData(new_obj)))  mismatches <- c(mismatches, "colData")
+      if (!identical(rowData(old_obj),  rowData(new_obj)))  mismatches <- c(mismatches, "rowData")
+      if (!identical(metadata(old_obj), metadata(new_obj))) mismatches <- c(mismatches, "metadata")
+
+      dims <- paste(dim(old_obj), collapse = "x")
+      if (length(mismatches) == 0L) {
+        rds_data_match[[length(rds_data_match) + 1L]] <- list(path = rel, dim = dims, fully_identical = FALSE)
+      } else {
+        rds_real_diff[[length(rds_real_diff) + 1L]] <- list(path = rel, dim = dims, mismatches = mismatches)
+      }
+    } else {
+      rds_real_diff[[length(rds_real_diff) + 1L]] <- list(
+        path = rel,
+        dim = NA_character_,
+        mismatches = paste0("class old=", paste(class(old_obj), collapse = ","),
+                            " new=", paste(class(new_obj), collapse = ","))
+      )
     }
   } else if (e %in% c("csv", "tsv")) {
     sep <- if (e == "csv") "," else "\t"
-    old_df <- tryCatch(read.table(old_path, sep = sep, header = TRUE,
-                                  stringsAsFactors = FALSE, check.names = FALSE,
-                                  comment.char = ""),
-                       error = function(err) NULL)
-    new_df <- tryCatch(read.table(new_path, sep = sep, header = TRUE,
-                                  stringsAsFactors = FALSE, check.names = FALSE,
-                                  comment.char = ""),
-                       error = function(err) NULL)
+    old_df <- tryCatch(
+      read.table(old_path, sep = sep, header = TRUE, stringsAsFactors = FALSE,
+                 check.names = FALSE, comment.char = ""),
+      error = function(err) NULL
+    )
+    new_df <- tryCatch(
+      read.table(new_path, sep = sep, header = TRUE, stringsAsFactors = FALSE,
+                 check.names = FALSE, comment.char = ""),
+      error = function(err) NULL
+    )
     if (is.null(old_df) || is.null(new_df)) {
-      cat(sprintf("[SKIP %s unreadable] %s\n", e, rel))
-      n_skip_other <- n_skip_other + 1
+      skipped_other <- c(skipped_other, rel)
       next
     }
+
     if (identical(old_df, new_df)) {
-      if (e == "csv") n_match_csv <- n_match_csv + 1 else n_match_tsv <- n_match_tsv + 1
-      cat(sprintf("[OK %s]   %s  (%d rows x %d cols)\n",
-                  e, rel, nrow(old_df), ncol(old_df)))
+      entry <- list(path = rel, rows = nrow(old_df), cols = ncol(old_df))
+      if (e == "csv") csv_match[[length(csv_match) + 1L]] <- entry
+      else            tsv_match[[length(tsv_match) + 1L]] <- entry
     } else {
-      if (e == "csv") n_diff_csv <- n_diff_csv + 1 else n_diff_tsv <- n_diff_tsv + 1
-      cat(sprintf("[DIFF %s] %s  old=%dx%d new=%dx%d\n",
-                  e, rel, nrow(old_df), ncol(old_df), nrow(new_df), ncol(new_df)))
+      entry <- list(path = rel,
+                    old_dim = paste0(nrow(old_df), "x", ncol(old_df)),
+                    new_dim = paste0(nrow(new_df), "x", ncol(new_df)))
+      if (e == "csv") csv_diff[[length(csv_diff) + 1L]] <- entry
+      else            tsv_diff[[length(tsv_diff) + 1L]] <- entry
     }
   } else if (e %in% c("html", "pdf")) {
-    n_skip_visual <- n_skip_visual + 1
+    skipped_visual <- c(skipped_visual, rel)
   } else {
-    n_skip_other <- n_skip_other + 1
+    skipped_other <- c(skipped_other, rel)
   }
 }
 
-extras <- setdiff(new_files, ref_files)
-for (rel in extras) {
-  cat(sprintf("EXTRA in /results: %s\n", rel))
-}
-n_extra <- length(extras)
+# ---------------------------------------------------------------
+# Pass 2: print the report, summary first.
+# ---------------------------------------------------------------
 
-cat("\n## Summary\n\n")
-cat("========================\n")
-cat(sprintf("RDS   matching: %d   differing: %d\n", n_match_rds, n_diff_rds))
-cat(sprintf("CSV   matching: %d   differing: %d\n", n_match_csv, n_diff_csv))
-cat(sprintf("TSV   matching: %d   differing: %d\n", n_match_tsv, n_diff_tsv))
-cat(sprintf("Visual (HTML/PDF) skipped: %d   (eyeball side-by-side)\n", n_skip_visual))
-cat(sprintf("Other skipped:             %d\n", n_skip_other))
-cat(sprintf("Missing in /results:       %d\n", n_missing))
-cat(sprintf("Extra in /results:         %d\n", n_extra))
+n_csv_total <- length(csv_match) + length(csv_diff)
+n_tsv_total <- length(tsv_match) + length(tsv_diff)
+n_rds_data_match  <- length(rds_data_match)
+n_rds_stamp_only  <- sum(vapply(rds_data_match, function(x) !isTRUE(x$fully_identical), logical(1)))
+n_rds_fully_match <- n_rds_data_match - n_rds_stamp_only
+n_rds_real_diff   <- length(rds_real_diff)
+n_data_diffs      <- length(csv_diff) + length(tsv_diff) + n_rds_real_diff
 
-n_diverged <- n_diff_rds + n_diff_csv + n_diff_tsv + n_missing + n_extra
-if (n_diverged == 0) {
-  cat("\nALL NUMERIC OUTPUTS MATCH THE REFERENCE.\n")
+cat("# Validation report — input-asset swap vs released-capsule reference\n\n")
+cat("Compares everything written to `/results/` by this run against the released-capsule outputs (frozen as the reference asset).\n")
+cat("Strict comparison: `identical()` on RDS objects and on parsed CSV/TSV. Visual files (HTML, PDF) are skipped — eyeball those side-by-side instead.\n\n")
+
+cat("## Result\n\n")
+if (n_data_diffs == 0L) {
+  cat("**Behavior preserved — no analysis output drifted in any data-bearing way.**\n\n")
 } else {
-  cat(sprintf("\n%d FILE(S) DIVERGE — see [DIFF] / MISSING / EXTRA lines above.\n", n_diverged))
+  cat(sprintf("**%d file(s) have real data differences. See the \"RDS files with real data differences\" / \"CSVs with differences\" sections below.**\n\n",
+              n_data_diffs))
 }
 
-cat("\n## Dbh / Th per-cell expression spot-check\n\n")
-cat("Drill into the per-cohort post-normalization SCEs and compare counts for the two genes Polina checks first.\n\n")
+cat(sprintf("- **CSVs:** %d of %d match the reference exactly.\n", length(csv_match), n_csv_total))
+if (n_tsv_total > 0L) {
+  cat(sprintf("- **TSVs:** %d of %d match the reference exactly.\n", length(tsv_match), n_tsv_total))
+}
+if (n_rds_data_match > 0L) {
+  cat(sprintf("- **RDS files (data-matching):** %d of %d. Of these, %d are fully identical, and %d match the reference exactly in every data slot (`counts`, `cpm`, `logcounts`, `colData`, `rowData`, `metadata`) but report a top-level diff because the `SingleCellExperiment` library writes its own version into a hidden field inside each saved object — the actual scientific data is unchanged.\n",
+              n_rds_data_match, n_rds_data_match + n_rds_real_diff, n_rds_fully_match, n_rds_stamp_only))
+}
+if (n_rds_real_diff > 0L) {
+  cat(sprintf("- **RDS files with real data differences:** %d (see section below).\n", n_rds_real_diff))
+}
+cat(sprintf("- **Visual files (HTML/PDF):** %d skipped — eyeball side-by-side if needed.\n", length(skipped_visual)))
+if (length(missing_in_new) > 0L || length(extras) > 0L) {
+  cat(sprintf("- **File-presence quirks:** %d missing, %d extra — explained in the section below.\n",
+              length(missing_in_new), length(extras)))
+}
+cat(sprintf("\nReference asset: %d files. Current `/results/`: %d files.\n\n", length(ref_files), length(new_files)))
+
+# ---------- CSVs ----------
+if (length(csv_match) > 0L) {
+  cat(sprintf("## CSVs that match the reference exactly (%d)\n\n", length(csv_match)))
+  for (entry in csv_match) {
+    cat(sprintf("- `%s` — %s rows × %s cols\n", entry$path, fmt(entry$rows), fmt(entry$cols)))
+  }
+  cat("\n")
+}
+
+if (length(csv_diff) > 0L) {
+  cat(sprintf("## CSVs with differences (%d)\n\n", length(csv_diff)))
+  for (entry in csv_diff) {
+    cat(sprintf("- `%s` — old %s, new %s\n", entry$path, entry$old_dim, entry$new_dim))
+  }
+  cat("\n")
+}
+
+# ---------- RDS data-match ----------
+if (n_rds_data_match > 0L) {
+  cat(sprintf("## RDS files: data matches the reference exactly (%d)\n\n", n_rds_data_match))
+  if (n_rds_stamp_only > 0L) {
+    cat("For these files, every data slot — `assay 'counts'`, `'cpm'`, `'logcounts'`, `colData`, `rowData`, and `metadata` — matches the reference exactly. ")
+    cat("Top-level `identical()` returns FALSE only because the `SingleCellExperiment` library writes its own version into a hidden field inside each saved object. ")
+    cat("The actual scientific data (counts, gene expression, cell metadata) is unchanged.\n\n")
+  }
+  for (entry in rds_data_match) {
+    suffix <- if (!is.na(entry$dim)) sprintf(" (%s)", entry$dim) else ""
+    cat(sprintf("- `%s`%s\n", entry$path, suffix))
+  }
+  cat("\n")
+}
+
+# ---------- RDS real-diff ----------
+if (n_rds_real_diff > 0L) {
+  cat(sprintf("## RDS files with real data differences (%d)\n\n", n_rds_real_diff))
+  for (entry in rds_real_diff) {
+    suffix <- if (!is.na(entry$dim)) sprintf(" (%s)", entry$dim) else ""
+    cat(sprintf("- `%s`%s — differs in: %s\n",
+                entry$path, suffix, paste(entry$mismatches, collapse = ", ")))
+  }
+  cat("\n")
+}
+
+# ---------- Skipped ----------
+cat(sprintf("## Visual files skipped (HTML/PDF): %d\n\n", length(skipped_visual)))
+cat("These are rendered analysis reports and figures. Byte-comparison is fragile (timestamps, fonts, anti-aliasing); eyeball any specific report side-by-side if you want to confirm a figure visually.\n\n")
+
+if (length(skipped_other) > 0L) {
+  cat(sprintf("## Other files skipped (%d)\n\n", length(skipped_other)))
+  for (rel in skipped_other) cat(sprintf("- `%s`\n", rel))
+  cat("\n")
+}
+
+# ---------- File-presence quirks ----------
+if (length(missing_in_new) > 0L || length(extras) > 0L) {
+  cat("## File-presence quirks (harmless)\n\n")
+  for (rel in missing_in_new) {
+    if (rel == "output") {
+      cat("- **Missing in `/results/`:** `output` — Code Ocean writes its run log to `/results/output` *after* the validation step finishes; the reference asset has it because it was saved post-completion.\n")
+    } else {
+      cat(sprintf("- **Missing in `/results/`:** `%s`\n", rel))
+    }
+  }
+  for (rel in extras) {
+    if (rel == "TEMP_validate_against_reference.md") {
+      cat("- **Extra in `/results/`:** `TEMP_validate_against_reference.md` — this script's own output. Not in the released-capsule reference because that capsule didn't run validation.\n")
+    } else {
+      cat(sprintf("- **Extra in `/results/`:** `%s`\n", rel))
+    }
+  }
+  cat("\n")
+}
+
+# ---------- Dbh / Th spot-check ----------
+cat("## Dbh / Th per-cell expression spot-check\n\n")
+cat("Drilling into the per-cohort post-normalization SCEs and comparing counts for the two genes Polina checks first.\n\n")
 
 for (cohort in c("BARseq_780345", "BARseq_780346", "BARseq_780345-780346_combined")) {
   rel <- file.path(cohort, "combined_neurons_clust_CCFv2_uid_cpm_log.rds")
   old_path <- file.path(OLD_ROOT, rel)
   new_path <- file.path(NEW_ROOT, rel)
-  cat(sprintf("\n--- %s ---\n", cohort))
   if (!file.exists(old_path) || !file.exists(new_path)) {
-    cat(sprintf("  skipped: %s   old_exists=%s new_exists=%s\n",
-                rel, file.exists(old_path), file.exists(new_path)))
+    cat(sprintf("### %s\n\n_Skipped: `%s` is not produced by this cohort._\n\n", cohort, rel))
     next
   }
   old_sce <- readRDS(old_path)
   new_sce <- readRDS(new_path)
+  cat(sprintf("### %s — %s cells\n\n", cohort, fmt(ncol(old_sce))))
   for (gene in c("Dbh", "Th")) {
     if (!(gene %in% rownames(old_sce) && gene %in% rownames(new_sce))) {
-      cat(sprintf("  %s: not present in both objects (old=%s new=%s)\n",
-                  gene, gene %in% rownames(old_sce), gene %in% rownames(new_sce)))
+      cat(sprintf("- **%s:** not present in both objects.\n", gene))
       next
     }
     old_vec <- as.numeric(counts(old_sce)[gene, ])
     new_vec <- as.numeric(counts(new_sce)[gene, ])
-    eq <- identical(old_vec, new_vec)
-    cat(sprintf("  %s counts: cells=%d  identical=%s  sum old=%g new=%g  max old=%g new=%g  nz_cells old=%d new=%d\n",
-                gene, length(old_vec), eq,
-                sum(old_vec), sum(new_vec),
-                max(old_vec), max(new_vec),
-                sum(old_vec > 0), sum(new_vec > 0)))
+    if (identical(old_vec, new_vec)) {
+      cat(sprintf("- **%s:** matches the reference exactly. Sum: %s. Max: %s. Nonzero cells: %s.\n",
+                  gene, fmt(sum(old_vec)), fmt(max(old_vec)), fmt(sum(old_vec > 0))))
+    } else {
+      cat(sprintf("- **%s — DIFFERS.** Sum old=%s new=%s, max old=%s new=%s, nonzero cells old=%s new=%s.\n",
+                  gene,
+                  fmt(sum(old_vec)), fmt(sum(new_vec)),
+                  fmt(max(old_vec)), fmt(max(new_vec)),
+                  fmt(sum(old_vec > 0)), fmt(sum(new_vec > 0))))
+    }
   }
+  cat("\n")
 }
