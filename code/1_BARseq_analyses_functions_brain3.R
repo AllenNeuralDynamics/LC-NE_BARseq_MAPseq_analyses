@@ -3,7 +3,7 @@
 # Set up paths
 BARSEQ_INPUT_DIR <- '/data/barseq_780345_2025-02-24_12-00-00_processed_MAT2RDS_2026-05-07_16-11-33/'  # read-only
 BARSEQ_OUTPUT_DIR <- '/results/BARseq_780345/'  # writable
-BARSEQ_CLUSTERING_DIR <- '/data/BARseq_780345_analysis_clustering/'  # pre-computed clustering, read-only
+BARSEQ_CLUSTERING_DIR <- '/code/cached_clustering/BARseq_780345/'  # pre-computed clustering, read-only — see clustering_freeze.md for provenance
 
 # Ensure output directory exists
 if (!dir.exists(BARSEQ_OUTPUT_DIR)) {
