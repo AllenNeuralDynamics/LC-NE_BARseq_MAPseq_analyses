@@ -26,3 +26,12 @@ Only the `umap.csv`, `cluster.csv`, and (for the combined cohort) `cluster_annot
 ## Why these are committed rather than regenerated at runtime
 
 `scater::runUMAP` is not seeded in the current code, so fresh runs would produce drifting UMAP layouts. Downstream figures depend on the specific layout the clustering analysis was originally built on — committing the CSVs locks the layout and cluster IDs to that specific run.
+
+## Forcing a fresh clustering run
+
+To bypass the cached CSVs and recompute clustering from scratch, set the `RECOMPUTE_CLUSTERING` environment variable to `true` (or `1`, or `yes`) before triggering a Reproducible Run. On Code Ocean this is set in the capsule's Environment Variables (gear icon → Environment Variables). The flag is read once at the top of `code/setup.R` and short-circuits every cache-check `if` block in the three `code/2_BARseq_norm_cluster_analyze_*.R` scripts.
+
+Two things to be aware of when using the flag:
+
+- **The first clustering round is slow** — Polina's stand-alone capsule runs took roughly 14 hours overnight to cluster all ~3M QCed cells in the first round. Plan accordingly.
+- **UMAP coordinates will drift** — `scater::runUMAP` is unseeded, so even with the same input data and same package versions, a fresh recompute will produce a different UMAP layout. Cluster IDs from `igraph::cluster_louvain` *are* seeded (via `BiocParallel::MulticoreParam(RNGseed=seed)`) and will be stable across recomputes, but the visual layout in UMAP plots will not match the manuscript's frozen layout.
