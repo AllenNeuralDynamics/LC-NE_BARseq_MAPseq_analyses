@@ -1,7 +1,7 @@
 ################# BARseq Analysis Functions #################
 
 # Set up paths
-BARSEQ_INPUT_DIR <- '/data/BARseq_MATtoRDSfiles_brain3_brain4/BARseq_780346/'  # read-only
+BARSEQ_INPUT_DIR <- '/data/barseq_780346_2025-06-13_12-00-00_processed_MAT2RDS_2026-05-07_16-13-23/'  # read-only
 BARSEQ_OUTPUT_DIR <- '/results/BARseq_780345-780346_combined/'  # writable
 BARSEQ_CLUSTERING_DIR <- '/data/BARseq_780345-780346_combined_analysis_clustering/'  # pre-computed clustering, read-only
 

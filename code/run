@@ -43,6 +43,7 @@ echo "brain4 BARseq exit code: $?"
 
 render_html 3_MAPseq_match_BARseq_brain3.R
 echo "brain3 MAPseq match exit code: $?"
+
 render_html 3_MAPseq_match_BARseq_brain4.R
 echo "brain4 MAPseq match exit code: $?"
 
@@ -64,5 +65,10 @@ render_html 6_MAPseq_ExA-SPIM_brain4.R
 echo "brain4 MAPseq ExA plots exit code: $?"
 render_html 6_MAPseq_ExA-SPIM_brain3-4_combined.R
 echo "brain3-4 combined MAPseq ExA plots exit code: $?"
+
+# TEMP — remove before merge along with TEMP_validate_against_reference.R and the reference data asset.
+# Run as plain Rscript with stdout to a .md file — easier to copy than the HTML render_html produces.
+Rscript -e "source('/code/setup.R'); source('/code/TEMP_validate_against_reference.R')" > /results/TEMP_validate_against_reference.md 2>&1
+echo "validation exit code: $?"
 
 echo "=== Reproducible Run complete. HTML reports saved to /results/ ==="
