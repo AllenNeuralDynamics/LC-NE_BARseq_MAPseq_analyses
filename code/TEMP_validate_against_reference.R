@@ -4,9 +4,156 @@ suppressPackageStartupMessages({
 
 OLD_ROOT <- "/data/temp_lc_paper_barseq_mapseq_frozen_v1_output"
 NEW_ROOT <- "/results"
+CLUSTERING_ROOT <- "/code/cached_clustering"
 
 stopifnot(dir.exists(OLD_ROOT))
 stopifnot(dir.exists(NEW_ROOT))
+
+# ---------------------------------------------------------------
+# Per-SCE diff drilldown helper. Returns a character vector of
+# markdown lines describing the diff in detail. Safe to call even
+# when no diff is present — emits a "no diff" line instead.
+# ---------------------------------------------------------------
+diagnose_sce_diff <- function(old_obj, new_obj, mismatches) {
+  out <- character()
+
+  fmt_vec <- function(v, n = 6L) {
+    if (length(v) == 0L) return("<empty>")
+    s <- head(as.character(v), n)
+    paste(s, collapse = ", ")
+  }
+
+  if ("colData" %in% mismatches) {
+    cd_old <- colData(old_obj); cd_new <- colData(new_obj)
+    out <- c(out, "  **colData drilldown:**")
+    out <- c(out, sprintf("  - ncol old=%d new=%d", ncol(cd_old), ncol(cd_new)))
+    if (!identical(colnames(cd_old), colnames(cd_new))) {
+      out <- c(out, sprintf("  - colnames old: %s", fmt_vec(colnames(cd_old), 50)))
+      out <- c(out, sprintf("  - colnames new: %s", fmt_vec(colnames(cd_new), 50)))
+      added <- setdiff(colnames(cd_new), colnames(cd_old))
+      removed <- setdiff(colnames(cd_old), colnames(cd_new))
+      if (length(added)   > 0L) out <- c(out, sprintf("  - added columns: %s",   paste(added,   collapse = ", ")))
+      if (length(removed) > 0L) out <- c(out, sprintf("  - removed columns: %s", paste(removed, collapse = ", ")))
+    }
+    rn_id <- identical(rownames(cd_old), rownames(cd_new))
+    out <- c(out, sprintf("  - rownames identical: %s", rn_id))
+    if (!rn_id && length(rownames(cd_old)) == length(rownames(cd_new))) {
+      n_rn_diff <- sum(rownames(cd_old) != rownames(cd_new))
+      out <- c(out, sprintf("    (%d of %d rownames differ; head old: %s; head new: %s)",
+                            n_rn_diff, length(rownames(cd_old)),
+                            fmt_vec(rownames(cd_old)), fmt_vec(rownames(cd_new))))
+    }
+
+    common <- intersect(colnames(cd_old), colnames(cd_new))
+    diff_cols <- character()
+    same_cols <- character()
+    for (cc in common) {
+      if (identical(cd_old[[cc]], cd_new[[cc]])) same_cols <- c(same_cols, cc)
+      else diff_cols <- c(diff_cols, cc)
+    }
+    out <- c(out, sprintf("  - per-column identical: %d of %d common columns match",
+                          length(same_cols), length(common)))
+    if (length(diff_cols) > 0L) {
+      out <- c(out, sprintf("  - **columns differing:** %s", paste(diff_cols, collapse = ", ")))
+      for (cc in diff_cols) {
+        ovec <- cd_old[[cc]]; nvec <- cd_new[[cc]]
+        cls_o <- class(ovec)[1]; cls_n <- class(nvec)[1]
+        len_ok <- length(ovec) == length(nvec)
+        out <- c(out, sprintf("    - `%s`: class old=%s new=%s, lengths equal: %s",
+                              cc, cls_o, cls_n, len_ok))
+        if (len_ok) {
+          o_chr <- as.character(ovec); n_chr <- as.character(nvec)
+          n_diff <- sum(o_chr != n_chr, na.rm = TRUE)
+          out <- c(out, sprintf("      - n positions differing (as character): %d of %d",
+                                n_diff, length(ovec)))
+          out <- c(out, sprintf("      - head old: %s", fmt_vec(ovec)))
+          out <- c(out, sprintf("      - head new: %s", fmt_vec(nvec)))
+        }
+        if (is.factor(ovec) && is.factor(nvec)) {
+          lev_id <- identical(levels(ovec), levels(nvec))
+          out <- c(out, sprintf("      - levels identical: %s", lev_id))
+          out <- c(out, sprintf("        - levels old: %s", fmt_vec(levels(ovec), 50)))
+          if (!lev_id) out <- c(out, sprintf("        - levels new: %s", fmt_vec(levels(nvec), 50)))
+          if (lev_id && len_ok && length(levels(ovec)) <= 20L) {
+            ct <- table(old = ovec, new = nvec)
+            out <- c(out, "      - contingency table (rows = old, cols = new):")
+            out <- c(out, "        ```")
+            ct_lines <- capture.output(print(ct))
+            out <- c(out, paste0("        ", ct_lines))
+            out <- c(out, "        ```")
+            # quick permutation hint: each old row peaks at exactly one new column
+            if (all(dim(ct) == length(levels(ovec)))) {
+              row_peaks <- apply(ct, 1, which.max)
+              if (length(unique(row_peaks)) == nrow(ct)) {
+                out <- c(out, "      - **looks like a label permutation** (each old label peaks at a distinct new label)")
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  assay_mm <- grep("^assay '", mismatches, value = TRUE)
+  if (length(assay_mm) > 0L) {
+    out <- c(out, "  **assay drilldown:**")
+    for (mm in assay_mm) {
+      a <- sub("^assay '(.*)'$", "\\1", mm)
+      if (!(a %in% assayNames(old_obj) && a %in% assayNames(new_obj))) next
+      old_a <- assay(old_obj, a); new_a <- assay(new_obj, a)
+      dim_match <- identical(dim(old_a), dim(new_a))
+      out <- c(out, sprintf("  - `%s`: dim old=%s new=%s, dim match: %s",
+                            a, paste(dim(old_a), collapse="x"), paste(dim(new_a), collapse="x"), dim_match))
+      cn_id <- identical(colnames(old_a), colnames(new_a))
+      rn_id <- identical(rownames(old_a), rownames(new_a))
+      out <- c(out, sprintf("    - colnames identical (same cells in same order): %s", cn_id))
+      out <- c(out, sprintf("    - rownames identical (same genes in same order): %s", rn_id))
+      if (!cn_id && length(colnames(old_a)) == length(colnames(new_a))) {
+        # check if it's a reorder (same set) vs a different set (different cell selection)
+        same_set <- setequal(colnames(old_a), colnames(new_a))
+        out <- c(out, sprintf("    - same cell SET (just reordered): %s", same_set))
+      }
+      if (dim_match) {
+        # diff in shared (intersection of colnames) submatrix
+        # avoid dense conversion of huge matrices; restrict to small failed files
+        if (ncol(old_a) <= 20000L) {
+          # align by colnames where possible
+          if (cn_id) {
+            o <- as.matrix(old_a); n <- as.matrix(new_a)
+          } else if (length(colnames(old_a)) == length(colnames(new_a)) &&
+                     setequal(colnames(old_a), colnames(new_a))) {
+            o <- as.matrix(old_a); n <- as.matrix(new_a)[, colnames(old_a), drop = FALSE]
+          } else {
+            o <- NULL; n <- NULL
+          }
+          if (!is.null(o)) {
+            d <- abs(o - n)
+            out <- c(out, sprintf("    - max abs diff: %s, sum abs diff: %s",
+                                  format(max(d), digits = 6), format(sum(d), digits = 6)))
+            out <- c(out, sprintf("    - cells with any diff: %d of %d", sum(colSums(d) > 0), ncol(d)))
+            out <- c(out, sprintf("    - genes with any diff: %d of %d", sum(rowSums(d) > 0), nrow(d)))
+          } else {
+            out <- c(out, "    - cell selection differs — element-wise diff not meaningful, skipped")
+          }
+        } else {
+          out <- c(out, sprintf("    - (matrix too large for element-wise diff: %d cells)", ncol(old_a)))
+        }
+      }
+    }
+  }
+
+  if ("rowData" %in% mismatches) {
+    out <- c(out, "  **rowData differs** (not drilled in)")
+  }
+  if ("metadata" %in% mismatches) {
+    out <- c(out, "  **metadata differs**")
+    mo <- metadata(old_obj); mn <- metadata(new_obj)
+    out <- c(out, sprintf("    - names old: %s", fmt_vec(names(mo), 50)))
+    out <- c(out, sprintf("    - names new: %s", fmt_vec(names(mn), 50)))
+  }
+
+  out
+}
 
 ref_files <- list.files(OLD_ROOT, recursive = TRUE, full.names = FALSE)
 new_files <- list.files(NEW_ROOT, recursive = TRUE, full.names = FALSE)
@@ -68,7 +215,13 @@ for (rel in sort(ref_files)) {
       if (length(mismatches) == 0L) {
         rds_data_match[[length(rds_data_match) + 1L]] <- list(path = rel, dim = dims, fully_identical = FALSE)
       } else {
-        rds_real_diff[[length(rds_real_diff) + 1L]] <- list(path = rel, dim = dims, mismatches = mismatches)
+        detail_lines <- tryCatch(
+          diagnose_sce_diff(old_obj, new_obj, mismatches),
+          error = function(e) sprintf("  (drilldown failed: %s)", conditionMessage(e))
+        )
+        rds_real_diff[[length(rds_real_diff) + 1L]] <- list(
+          path = rel, dim = dims, mismatches = mismatches, detail = detail_lines
+        )
       }
     } else {
       rds_real_diff[[length(rds_real_diff) + 1L]] <- list(
@@ -155,6 +308,34 @@ if (length(missing_in_new) > 0L || length(extras) > 0L) {
 }
 cat(sprintf("\nReference asset: %d files. Current `/results/`: %d files.\n\n", length(ref_files), length(new_files)))
 
+# ---------- Clustering cache state ----------
+cat("## Clustering cache state\n\n")
+recompute_env <- Sys.getenv("RECOMPUTE_CLUSTERING", "")
+recompute_active <- tolower(recompute_env) %in% c("true", "1", "yes")
+cat(sprintf("- `RECOMPUTE_CLUSTERING` env: `%s` → %s\n",
+            ifelse(nzchar(recompute_env), recompute_env, "<unset>"),
+            ifelse(recompute_active, "**cache BYPASSED, fresh clustering forced**", "cache enabled")))
+cat(sprintf("- `CLUSTERING_ROOT`: `%s` (exists: %s)\n", CLUSTERING_ROOT, dir.exists(CLUSTERING_ROOT)))
+
+if (dir.exists(CLUSTERING_ROOT)) {
+  cohort_dirs <- list.dirs(CLUSTERING_ROOT, recursive = FALSE, full.names = FALSE)
+  for (cohort in cohort_dirs) {
+    cohort_path <- file.path(CLUSTERING_ROOT, cohort)
+    rounds <- list.dirs(cohort_path, recursive = FALSE, full.names = FALSE)
+    cat(sprintf("- `%s/`: %d round(s)\n", cohort, length(rounds)))
+    for (rd in rounds) {
+      rp <- file.path(cohort_path, rd)
+      has_umap <- file.exists(file.path(rp, "umap.csv"))
+      has_clu  <- file.exists(file.path(rp, "cluster.csv"))
+      has_ann  <- file.exists(file.path(rp, "cluster_annotation.csv"))
+      would_hit <- !recompute_active && dir.exists(rp) && has_umap && has_clu
+      cat(sprintf("  - `%s/`: umap.csv=%s, cluster.csv=%s, cluster_annotation.csv=%s → **cache hit predicate: %s**\n",
+                  rd, has_umap, has_clu, has_ann, would_hit))
+    }
+  }
+}
+cat("\n")
+
 # ---------- CSVs ----------
 if (length(csv_match) > 0L) {
   cat(sprintf("## CSVs that match the reference exactly (%d)\n\n", length(csv_match)))
@@ -196,6 +377,17 @@ if (n_rds_real_diff > 0L) {
                 entry$path, suffix, paste(entry$mismatches, collapse = ", ")))
   }
   cat("\n")
+
+  cat("## Detailed diagnostics for diverged RDS files\n\n")
+  for (entry in rds_real_diff) {
+    suffix <- if (!is.na(entry$dim)) sprintf(" (%s)", entry$dim) else ""
+    cat(sprintf("### `%s`%s\n\n", entry$path, suffix))
+    cat(sprintf("- differs in: %s\n", paste(entry$mismatches, collapse = ", ")))
+    if (!is.null(entry$detail) && length(entry$detail) > 0L) {
+      cat(paste(entry$detail, collapse = "\n"), "\n", sep = "")
+    }
+    cat("\n")
+  }
 }
 
 # ---------- Skipped ----------
