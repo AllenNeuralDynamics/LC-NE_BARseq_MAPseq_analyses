@@ -143,22 +143,30 @@ calculate_spatial_density <- function(sce, k = 10, slice_thickness = 20) {
 
 ################## Clean up work space between processing steps ##################
 clear_objects_except_functions <- function() {
+  before_recompute <- exists("RECOMPUTE_CLUSTERING", envir = .GlobalEnv)
   obj_list <- ls(envir = .GlobalEnv)
-  
+
   # Keep functions and the clearing function itself
   to_keep <- obj_list[sapply(obj_list, function(x) {
     obj <- get(x, envir = .GlobalEnv)
     is.function(obj)
   })]
-  
-  # Also keep your directory paths
-  to_keep <- c(to_keep, "BARSEQ_INPUT_DIR", "BARSEQ_OUTPUT_DIR", "BARSEQ_CLUSTERING_DIR", "fig_dir")
-  
+
+  # Also keep directory paths and the cache-control flag
+  to_keep <- c(to_keep, "BARSEQ_INPUT_DIR", "BARSEQ_OUTPUT_DIR", "BARSEQ_CLUSTERING_DIR", "fig_dir", "RECOMPUTE_CLUSTERING")
+
   to_remove <- setdiff(obj_list, to_keep)
-  
+
   if(length(to_remove) > 0) {
     cat("Removing:", paste(to_remove, collapse = ", "), "\n")
     rm(list = to_remove, envir = .GlobalEnv)
+  }
+
+  after_recompute <- exists("RECOMPUTE_CLUSTERING", envir = .GlobalEnv)
+  if (dir.exists("/results")) {
+    cat(sprintf("[%s] clear_objects (brain4): RECOMPUTE_CLUSTERING before=%s after=%s\n",
+                format(Sys.time()), before_recompute, after_recompute),
+        file = "/results/cache_diagnostic.log", append = TRUE)
   }
   
   # Force garbage collection
