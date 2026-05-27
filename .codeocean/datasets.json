@@ -18,6 +18,10 @@
 			"mount": "temp_lc_paper_barseq_mapseq_frozen_v1_output"
 		},
 		{
+			"id": "a78668f6-3451-42d4-9a83-d88f6884e83d",
+			"mount": "BARseq_780345_analysis_clustering"
+		},
+		{
 			"id": "b60463ab-6d8b-4b0f-9074-5a579e22b037",
 			"mount": "MAPseq_ROI_info"
 		},
