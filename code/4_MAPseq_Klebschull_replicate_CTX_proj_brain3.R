@@ -14,7 +14,7 @@ LCNEneurons <- readRDS("LCNE_clusters_filtered_coherence_filtered_cpm_log_clust.
 colData(LCNEneurons)
 cell_metadata <- as.data.frame(colData(LCNEneurons))
 
-proj_index <- read_tsv("/data/barseq_780345_2025-02-24_12-00-00_processed_MAT2RDS_2026-05-28_17-49-02/MAPseq/sampleinfo_780345.tsv")
+proj_index <- read_tsv("/data/mapseq_780345_2025-03-24_12-00-00/MAPseq/sampleinfo_780345.tsv")
 head(proj_index)
 sampleinfo <- read_excel(file.path(MAPSEQ_INPUT_DIR, "M295_20250721.sampleinfo.xlsx"), sheet = "Sample information")
 head(sampleinfo)
