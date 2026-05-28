@@ -6,12 +6,20 @@
 			"mount": "mapseq_780345_2025-03-24_12-00-00"
 		},
 		{
+			"id": "4faf9bf6-f404-4add-abd7-48547afecff2",
+			"mount": "barseq_780345_2025-02-24_12-00-00_processed_MAT2RDS_2026-05-28_17-49-02"
+		},
+		{
 			"id": "8eb75b0f-54be-4d04-88c5-abc224e779b7",
 			"mount": "temp_lc_paper_barseq_mapseq_frozen_v1_output"
 		},
 		{
 			"id": "eb1f4b76-d2e5-4969-b546-808e257c6688",
 			"mount": "mapseq_780346_2025-07-23_12-00-00"
+		},
+		{
+			"id": "f66a5a57-ecc8-47a0-92cc-71fae06c43bd",
+			"mount": "barseq_780346_2025-06-13_12-00-00_processed_MAT2RDS_2026-05-28_17-50-51"
 		}
 	]
 }
