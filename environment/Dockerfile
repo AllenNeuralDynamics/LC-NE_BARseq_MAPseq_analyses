@@ -1,4 +1,4 @@
-# hash:sha256:b02abc5aeaa30c8f518b73947791cd29fddedef3b13bb1cbde0889b37ce47606
+# hash:sha256:ed427fb9cb4bf670ddcf31adbaf6cc4a91eec73fdd14d9fe8dd3ed6ab7ef62ea
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/c2-seurat:latest
 
@@ -6,16 +6,11 @@ ARG DEBIAN_FRONTEND=noninteractive
 ARG GIT_ASKPASS
 COPY git-ask-pass /
 
-RUN mamba install -y \
-        r-base==4.3.0 \
-    && mamba clean -ya
+COPY barseq-r4.yml /tmp/barseq-r4.yml
 
-RUN Rscript -e 'options(warn=2); install.packages("BiocManager")'
-RUN Rscript -e 'options(warn=2); BiocManager::install(c( \
-        "BiocVersion", \
-        "IRanges", \
-        "scater" \
-    ))' # Original versions: 3.18.1 2.36.0 1.30.1
-
-COPY postInstall /
-RUN /postInstall
+RUN mamba update -n base -c conda-forge mamba libsolv -y || true \
+ && rm -rf /opt/conda/envs/* /etc/mamba-envs/* \
+ && mamba env create -f /tmp/barseq-r4.yml \
+ && rm /tmp/barseq-r4.yml \
+ && echo "/opt/conda/envs/barseq-r4/lib" > /etc/ld.so.conf.d/barseq-r4.conf \
+ && ldconfig

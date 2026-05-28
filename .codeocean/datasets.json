@@ -6,16 +6,8 @@
 			"mount": "mapseq_780345_2025-03-24_12-00-00"
 		},
 		{
-			"id": "0e3f1b4f-2f63-4692-acfe-1411d3f44e25",
-			"mount": "BARseq_780346_analysis_clustering"
-		},
-		{
 			"id": "26958297-9de2-4eab-98ce-f1932d6d89c6",
 			"mount": "barseq_780346_2025-06-13_12-00-00_processed_MAT2RDS_2026-05-07_16-13-23"
-		},
-		{
-			"id": "546c49f5-56c0-45fa-9787-6582332482a5",
-			"mount": "BARseq_780345-780346_combined_analysis_clustering"
 		},
 		{
 			"id": "80538a79-932f-4ee1-88a9-20a4c0f54662",
@@ -24,10 +16,6 @@
 		{
 			"id": "8eb75b0f-54be-4d04-88c5-abc224e779b7",
 			"mount": "temp_lc_paper_barseq_mapseq_frozen_v1_output"
-		},
-		{
-			"id": "a78668f6-3451-42d4-9a83-d88f6884e83d",
-			"mount": "BARseq_780345_analysis_clustering"
 		},
 		{
 			"id": "b60463ab-6d8b-4b0f-9074-5a579e22b037",

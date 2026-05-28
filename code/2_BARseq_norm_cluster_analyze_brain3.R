@@ -26,8 +26,8 @@ dim(barseq)
 # Check if clustering analysis already exists
 clustering_data_dir <- file.path(BARSEQ_CLUSTERING_DIR, "barseq_all_QCed_cells")
 
-if (dir.exists(clustering_data_dir) && 
-    file.exists(file.path(clustering_data_dir, "umap.csv")) && 
+if (!RECOMPUTE_CLUSTERING && dir.exists(clustering_data_dir) &&
+    file.exists(file.path(clustering_data_dir, "umap.csv")) &&
     file.exists(file.path(clustering_data_dir, "cluster.csv"))) {
   cat("Analysis results already exist for barseq_all_QCed_cells. Skipping clustering step.\n")
   umap_read_dir <- clustering_data_dir
@@ -235,7 +235,7 @@ colData(LC_barseq)
 assayNames(LC_barseq)
 
 lc_dir <- file.path(BARSEQ_CLUSTERING_DIR,"barseq_LCcluster_cells")
-if (dir.exists(lc_dir) &&
+if (!RECOMPUTE_CLUSTERING && dir.exists(lc_dir) &&
     file.exists(file.path(lc_dir, "umap.csv")) &&
     file.exists(file.path(lc_dir, "cluster.csv"))) {
   cat("Loading cached results for barseq_LCcluster_cells.\n")
@@ -372,7 +372,7 @@ colData(LCNE_barseq)
 assayNames(LCNE_barseq)
 
 lcne_dir <- file.path(BARSEQ_CLUSTERING_DIR, "barseq_LC_NE_cells")
-if (dir.exists(lcne_dir) &&
+if (!RECOMPUTE_CLUSTERING && dir.exists(lcne_dir) &&
     file.exists(file.path(lcne_dir, "umap.csv")) &&
     file.exists(file.path(lcne_dir, "cluster.csv"))) {
   cat("Loading cached results for barseq_LC_NE_cells.\n")
@@ -575,7 +575,7 @@ colData(LCNE) <- colData(LCNE)[, !(colnames(colData(LCNE)) %in% cols_to_drop)]
 
 # Run clustering on the data and save results to a named folder
 lcne_filt_dir <- file.path(BARSEQ_CLUSTERING_DIR, "barseq_LC_NE_clusters_filtered")
-if (dir.exists(lcne_filt_dir) &&
+if (!RECOMPUTE_CLUSTERING && dir.exists(lcne_filt_dir) &&
     file.exists(file.path(lcne_filt_dir, "umap.csv")) &&
     file.exists(file.path(lcne_filt_dir, "cluster.csv"))) {
   cat("Loading cached results for barseq_LC_NE_clusters_filtered.\n")
@@ -939,7 +939,7 @@ colData(LCNE) <- colData(LCNE)[, !(colnames(colData(LCNE)) %in% cols_to_drop)]
 
 # Run clustering on the data and save results to a named folder
 lcne_coh_dir <- file.path(BARSEQ_CLUSTERING_DIR, "barseq_LC_NE_clusters_filtered_coherence_filtered")
-if (dir.exists(lcne_coh_dir) &&
+if (!RECOMPUTE_CLUSTERING && dir.exists(lcne_coh_dir) &&
     file.exists(file.path(lcne_coh_dir, "umap.csv")) &&
     file.exists(file.path(lcne_coh_dir, "cluster.csv"))) {
   cat("Loading cached results for barseq_LC_NE_clusters_filtered_coherence_filtered.\n")

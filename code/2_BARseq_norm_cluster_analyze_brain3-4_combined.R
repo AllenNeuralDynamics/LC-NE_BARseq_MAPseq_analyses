@@ -69,9 +69,9 @@ umap_file    <- file.path(clustering_data_dir, "umap.csv")
 cluster_file <- file.path(clustering_data_dir, "cluster.csv")
 annot_file   <- file.path(clustering_data_dir, "cluster_annotation.csv")
 
-if (dir.exists(clustering_data_dir) && file.exists(umap_file) && file.exists(cluster_file) && file.exists(annot_file)) {
+if (!RECOMPUTE_CLUSTERING && dir.exists(clustering_data_dir) && file.exists(umap_file) && file.exists(cluster_file) && file.exists(annot_file)) {
   cat("All analysis results already exist in data asset. Skipping clustering.\n")
-} else if (dir.exists(clustering_data_dir) && file.exists(umap_file)) {
+} else if (!RECOMPUTE_CLUSTERING && dir.exists(clustering_data_dir) && file.exists(umap_file)) {
   cat("UMAP exists but clustering incomplete. Loading UMAP and running PCA-based clustering...\n")
   umap_mat <- as.matrix(read_csv(umap_file))
   rownames(umap_mat) <- colnames(combined_sce)
