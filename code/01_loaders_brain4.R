@@ -40,7 +40,7 @@ load_data <-function() {
   # Load sample information
   proj_index <- read_tsv(file.path(MAPSEQ_INPUT_DIR, "M305sampleinfo.tsv"))
   head(proj_index)
-  sampleinfo <- read_excel("/data/MAPseq_ROI_info/sampleinfo_780346.xlsx", sheet = "Sample information", skip = 1,range = "A2:J122")
+  sampleinfo <- read_excel("/data/barseq_780346_2025-06-13_12-00-00_processed_MAT2RDS_2026-05-28_17-50-51/MAPseq/sampleinfo_780346.xlsx", sheet = "Sample information", skip = 1,range = "A2:J122")
   head(sampleinfo)
   colnames(sampleinfo) <- c("usertube", "ourtube", "samplename", "siteinfo", "QC_qPCR", "rtprimer", "brain", "hemisphere", "ROI", "notes")
 
