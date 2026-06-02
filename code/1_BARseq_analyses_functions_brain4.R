@@ -1,7 +1,7 @@
 ################# BARseq Analysis Functions #################
 
 # Set up paths
-BARSEQ_INPUT_DIR <- '/data/barseq_780346_2025-06-13_12-00-00_processed_MAT2RDS_2026-05-07_16-13-23/'  # read-only
+BARSEQ_INPUT_DIR <- '/data/barseq_780346_2025-06-13_12-00-00_processed_MAT2RDS_2026-05-28_17-50-51/BARseq/'  # read-only
 BARSEQ_OUTPUT_DIR <- '/results/BARseq_780346/'  # writable
 BARSEQ_CLUSTERING_DIR <- '/code/cached_clustering/BARseq_780346/'  # pre-computed clustering, read-only — see clustering_freeze.md for provenance
 
@@ -143,7 +143,6 @@ calculate_spatial_density <- function(sce, k = 10, slice_thickness = 20) {
 
 ################## Clean up work space between processing steps ##################
 clear_objects_except_functions <- function() {
-  before_recompute <- exists("RECOMPUTE_CLUSTERING", envir = .GlobalEnv)
   obj_list <- ls(envir = .GlobalEnv)
 
   # Keep functions and the clearing function itself
@@ -160,13 +159,6 @@ clear_objects_except_functions <- function() {
   if(length(to_remove) > 0) {
     cat("Removing:", paste(to_remove, collapse = ", "), "\n")
     rm(list = to_remove, envir = .GlobalEnv)
-  }
-
-  after_recompute <- exists("RECOMPUTE_CLUSTERING", envir = .GlobalEnv)
-  if (dir.exists("/results")) {
-    cat(sprintf("[%s] clear_objects (brain4): RECOMPUTE_CLUSTERING before=%s after=%s\n",
-                format(Sys.time()), before_recompute, after_recompute),
-        file = "/results/cache_diagnostic.log", append = TRUE)
   }
   
   # Force garbage collection

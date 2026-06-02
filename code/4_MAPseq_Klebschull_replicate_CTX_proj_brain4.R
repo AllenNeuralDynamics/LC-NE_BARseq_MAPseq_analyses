@@ -16,7 +16,7 @@ cell_metadata <- as.data.frame(colData(LCNEneurons))
 
 proj_index <- read_tsv(file.path(MAPSEQ_INPUT_DIR, "M305sampleinfo.tsv"))
 head(proj_index)
-sampleinfo <- read_excel("/data/MAPseq_ROI_info/sampleinfo_780346.xlsx", sheet = "Sample information", skip = 1,range = "A2:J122")
+sampleinfo <- read_excel("/data/mapseq_780346_2025-07-23_12-00-00/MAPseq/sampleinfo_780346.xlsx", sheet = "Sample information", skip = 1,range = "A2:J122")
 head(sampleinfo)
 colnames(sampleinfo) <- c("usertube", "ourtube", "samplename", "siteinfo", "QC_qPCR", "rtprimer", "brain", "hemisphere", "ROI", "notes")
 
@@ -626,7 +626,7 @@ write.csv(sanity_table, "duplicate_positions_sanity_table.csv", row.names = FALS
 # QC + transcriptomic metrics for duplicate groups (VBC groups; includes mapped MAPseq hash ID)
 ####################################################################################################
 # Load segmentation QC data
-good_cells <- read.csv("/data/BARseq_soma_barcodes/LC_visualQC_barcoded_cells_780346.csv", stringsAsFactors = FALSE)
+good_cells <- read.csv("/data/barseq_780346_2025-06-13_12-00-00_processed_MAT2RDS_2026-05-28_17-50-51/BARseq/LC_visualQC_barcoded_cells_780346.csv", stringsAsFactors = FALSE)
 # Standardize uid column as character (safer joins)
 good_cells$uid <- as.character(good_cells$uid)
 good_uids <- good_cells$uid[good_cells$good_barcoded == 1]

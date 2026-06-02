@@ -1,0 +1,89 @@
+# LC-NE BARseq and MAPseq Analyses
+
+Code for analyzing BARseq and MAPseq projection data from locus coeruleus norepinephrine (LC-NE) neurons, as described in:
+
+> Su, Kosillo, Jung, Chen *et al.* (2026). Topographic structure and function of locus coeruleus norepinephrine neurons. [bioRxiv 2026.04.10.717727](https://www.biorxiv.org/content/10.64898/2026.04.10.717727v1)
+
+The capsule processes BARseq gene-expression barcoding and MAPseq projection-mapping data from two specimens (780345 and 780346) to identify LC-NE neuron subtypes and characterize their projection patterns. Outputs feed **Figure S5** of the manuscript.
+
+**GitHub:** https://github.com/AllenNeuralDynamics/LC-NE_BARseq_MAPseq_analyses
+**Code Ocean:** https://codeocean.allenneuraldynamics.org/capsule/2195789/tree
+**Collection:** https://codeocean.allenneuraldynamics.org/collections/9cf044ce-93c7-4c7e-bfa1-5d8c37aa42ec
+
+## Running
+
+Click **Reproducible Run** in Code Ocean. The `run` script renders each numbered analysis stage to a self-contained HTML report (~1–2 hours on a large instance).
+
+## Code
+
+- `setup.R`, `00_env_lib_loading.R` — load R libraries
+- `01_loaders_*.R`, `02_prepare_brain3_4_combined_inputs.R` — per-brain data loaders + combined-brain prep
+- `1_BARseq_analyses_functions_*.R` — shared functions (normalization, clustering, spatial coherence)
+- `2_BARseq_norm_cluster_analyze_*.R` — normalize counts, cluster, identify LC-NE cells
+- `3_MAPseq_match_BARseq_*.R` — match BARseq barcodes to MAPseq barcodes (Hamming distance)
+- `4_MAPseq_Klebschull_replicate_CTX_proj_*.R` — replicate Bhatt/Kebschull et al. (2022) cortical projection analysis
+- `5_MAPseq_probability_*.R` — projection probabilities, heatmaps, co-innervation
+- `6_MAPseq_ExA-SPIM_*.R` — comparison with ExA-SPIM single-neuron morphology
+
+Each numbered stage has three variants: `_brain3.R`, `_brain4.R`, `_brain3-4_combined.R`.
+
+Clustering UMAPs + cluster-label CSVs are committed under `code/cached_clustering/` and reloaded by default — see `code/cached_clustering/clustering_freeze.md` for provenance. Set `RECOMPUTE_CLUSTERING=true` in the capsule's environment variables to recompute clustering from scratch.
+
+## Inputs
+
+Four data assets are attached, one BARseq + one MAPseq per specimen. Files within each are loaded directly from `/data/<asset_mount>/...` by the analysis scripts.
+
+### BARseq per-specimen assets (`barseq_780345_..._processed_MAT2RDS_...`, `barseq_780346_..._processed_MAT2RDS_...`)
+
+Outputs of the `LC-NE_BARseq_MAT-RDS_conversion` capsule, which converts the upstream MATLAB BARseq pipeline outputs into R-friendly formats ([GitHub](https://github.com/AllenNeuralDynamics/LC-NE_BARseq_MAT-RDS_conversion), [Code Ocean](https://codeocean.allenneuraldynamics.org/capsule/3953531)). All files live under `BARseq/` inside each asset.
+
+| File | Description |
+|---|---|
+| `combined_neurons_clust_CCFv2_uid.rds` | `SingleCellExperiment` of all QCed BARseq cells for the specimen (~300–500 K cells × 103 genes). Contains the raw count matrix plus per-cell `colData` columns: CCF coordinates (`CCF_AP`, `CCF_DV`, `CCF_ML`, `CCFano`), slice index, imaging-FOV coordinates, somatic-barcode index, batch, and a unique cell id (`uid`). Loaded at the top of stage 2; the entry point for the whole pipeline. |
+| `combined_neurons_clust_CCFv2.rds` | Predecessor of the above without `uid` assignment. Not used; superseded. |
+| `DBHfilteredneurons_clust_CCFv2_uid.rds` | An earlier `Dbh`-positive-only subset, kept for historical context. Not used by this pipeline. |
+| `barcodes_BC_qc_<subject>.csv` | Per-cell BARseq somatic barcode sequences (15 nt) for cells that passed barcode QC. Joined to MAPseq projection barcodes via Hamming-distance matching in stage 3. |
+| `LC_visualQC_barcoded_cells_<subject>.csv` | Manual visual-QC annotations of barcoded LC-NE cells (`uid` + QC flags). Used in stages 3 and 4 to restrict barcode matching and projection analyses to cells that passed visual QC. |
+
+### MAPseq per-specimen assets (`mapseq_780345_2025-03-24_12-00-00`, `mapseq_780346_2025-07-23_12-00-00`)
+
+Raw MAPseq projection-barcode counts and dissection metadata. The relevant files live in two places inside each asset:
+
+| File | Location | Description |
+|---|---|---|
+| `<subject>.nbcm.tsv` | `MAPseq/M<run>_<date>_USEthis/` | Filtered (background-subtracted, spike-in-normalized) MAPseq UMI count matrix — rows = projection barcodes, columns = ROIs (`BC*`) and a soma column. The primary MAPseq input for downstream matching. |
+| `<subject>.rbcm.tsv` | same | Raw MAPseq UMI count matrix (pre-filter). Used in stage 3 QC checks only. |
+| `<subject>.sbcm.tsv` | same | Spike-in barcode counts. Used in stage 3 QC checks only. |
+| `M<run>sampleinfo.tsv` or `M<run>_<date>.sampleinfo.xlsx` | same | Per-tube experiment metadata (tube number, dissection labels, processing notes). The brain3 asset has both; brain4 has only the xlsx. |
+| `sampleinfo_<subject>.tsv` (brain3) / `sampleinfo_<subject>.xlsx` (brain4) | `MAPseq/` (asset root) | Curated lookup table mapping MAPseq sample-tube numbers (`BC*`) to CCF brain-region names + dissection metadata. Used in stages 1/4 to label projection columns with region names. |
+
+## Outputs
+
+The pipeline writes HTML reports plus PDF/CSV outputs to:
+
+- `/results/BARseq_780345/` — brain3 (specimen 780345)
+- `/results/BARseq_780346/` — brain4 (specimen 780346)
+- `/results/BARseq_780345-780346_combined/` — combined cross-brain analyses
+
+### Figure S5: LC-NE projections measured with MAPseq and BARseq
+
+<!-- TODO: Authors — please verify the file-to-panel assignments below. -->
+
+| Panel | Description | Output file(s) | Stage |
+|-------|-------------|-----------------|-------|
+| S5c | LC-NE marker gene expression in BARseq cells | `LCNE_cells_gene_expression.pdf`, `Log-count gene expression in LCNE clusters filtered coherence filtered.pdf` | 2 |
+| S5d | Locations of LC-NE neurons in MAPseq/BARseq | `LCNE_cluster_cells_slices.pdf`, `unique_cells_localization_by_batch_shades.pdf` | 2 |
+| S5e | Normalized projection strengths, ipsilateral and contralateral | `Combined_heatmap_with_soma_loc_legend.pdf`, `Combined_ipsi-contra_projections_heatmap_top_region_sorted.pdf` | 5 |
+| S5f | Fraction of barcodes per CNS region (cf. Fig 2c) | `Combined_absolute_number_of_cells_with_non-zero_projections_to_aggregated_ROI.pdf` | 5 |
+| S5g | Rank correlation of shared projections (cf. Fig 2c) | `rank_corr_ipsi-contra.pdf` | 6 |
+| S5h | Spatial distribution of neurons by projection target (cf. Fig 2e) | — *author to confirm* — | 2 or 5 |
+
+Figure S5 files live in `/results/BARseq_780345-780346_combined/`. Per-brain versions are in the brain3 / brain4 subdirectories. Panels S5a (schema) and S5b (dissection boundaries) are manually drawn schematics, not generated by code.
+
+## Environment
+
+R 4.3.0 with Seurat, SingleCellExperiment, scater, scran, MetaNeighbor, and ~30 additional packages. Pinned versions in `environment/barseq-r4.yml`; consumed by `environment/Dockerfile`.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

@@ -63,7 +63,7 @@ table(colData(LCNEcluster)$louvain_cluster)
 ############################################################################################################################################################################################################
 # Process barcode information for all barcoded cells from BARseq experiment and convert them to MAPseq basecalls format
 # Read CSV without column names, and name columns manually
-barcodes_raw <- read_csv("/data/BARseq_soma_barcodes/barcodes_BC_qc_780345.csv", col_names = FALSE)
+barcodes_raw <- read_csv("/data/barseq_780345_2025-02-24_12-00-00_processed_MAT2RDS_2026-05-28_17-49-02/BARseq/barcodes_BC_qc_780345.csv", col_names = FALSE)
 # Rename for clarity
 colnames(barcodes_raw)[1] <- "CellID"
 colnames(barcodes_raw)[2:16] <- paste0("B", 1:15)  # Barcode positions
@@ -377,7 +377,7 @@ print_and_save_duplicates(result_2, proj_2_nodup, "proj_2_duplicated_rows.csv")
 #####################################################################################################################################################################################
 # Only retain cells for genes vs projections processing which pass visual QC
 # Load visual QC info CSV 
-visualQC <- read.csv("/data/BARseq_soma_barcodes/LC_visualQC_barcoded_cells_780345.csv", header = TRUE, stringsAsFactors = FALSE)
+visualQC <- read.csv("/data/barseq_780345_2025-02-24_12-00-00_processed_MAT2RDS_2026-05-28_17-49-02/BARseq/LC_visualQC_barcoded_cells_780345.csv", header = TRUE, stringsAsFactors = FALSE)
 # Check that the 'uid' column exists
 if (!"uid" %in% colnames(visualQC)) {
   stop("No 'uid' column found in LC_visualQC_barcoded_cells.csv")
