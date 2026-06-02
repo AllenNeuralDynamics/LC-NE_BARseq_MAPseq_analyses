@@ -143,7 +143,6 @@ calculate_spatial_density <- function(sce, k = 10, slice_thickness = 20) {
 
 ################## Clean up work space between processing steps ##################
 clear_objects_except_functions <- function() {
-  before_recompute <- exists("RECOMPUTE_CLUSTERING", envir = .GlobalEnv)
   obj_list <- ls(envir = .GlobalEnv)
 
   # Keep functions and the clearing function itself
@@ -160,13 +159,6 @@ clear_objects_except_functions <- function() {
   if(length(to_remove) > 0) {
     cat("Removing:", paste(to_remove, collapse = ", "), "\n")
     rm(list = to_remove, envir = .GlobalEnv)
-  }
-
-  after_recompute <- exists("RECOMPUTE_CLUSTERING", envir = .GlobalEnv)
-  if (dir.exists("/results")) {
-    cat(sprintf("[%s] clear_objects (brain4): RECOMPUTE_CLUSTERING before=%s after=%s\n",
-                format(Sys.time()), before_recompute, after_recompute),
-        file = "/results/cache_diagnostic.log", append = TRUE)
   }
   
   # Force garbage collection
