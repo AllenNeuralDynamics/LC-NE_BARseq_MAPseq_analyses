@@ -66,4 +66,14 @@ echo "brain4 MAPseq ExA plots exit code: $?"
 render_html 6_MAPseq_ExA-SPIM_brain3-4_combined.R
 echo "brain3-4 combined MAPseq ExA plots exit code: $?"
 
+# Reorganize /results/ for publication: copy manuscript panels into
+# paper_figures/FigureS5/ and move per-cohort output under other_figures/.
+Rscript 07_collect_paper_figures.R
+echo "collect paper figures exit code: $?"
+
+# Generate AIND derived-asset metadata (data_description.json + processing.json)
+# so the results can be published as an aind-open-data asset.
+python3 08_generate_metadata.py
+echo "generate metadata exit code: $?"
+
 echo "=== Reproducible Run complete. HTML reports saved to /results/ ==="
