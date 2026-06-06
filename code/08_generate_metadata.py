@@ -10,88 +10,39 @@ input, so it needs provenance):
       input assets in source_data, and leaves subject_id unset (this asset
       spans two subjects -- 780345 and 780346 -- which the schema's single
       subject_id field can't represent; both are captured via source_data).
+      The asset name is built from ASSET_BASE_NAME + creation time, per the
+      AIND create_processing_metadata guidance for derived assets.
   - processing.json : describes this analysis run (capsule URL + release
       version pulled from the Code Ocean REST API at runtime).
 
-Mirrors the metadata step in the sibling capsule LC-NE_BARseq_MAT-RDS_conversion.
 All schema construction goes through aind-data-schema's Pydantic models, so any
 schema violation raises and aborts the run.
 """
 
-import base64
-import json
-import os
-import urllib.error
-import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
 from aind_data_schema.components.identifiers import Code, DataAsset
 from aind_data_schema.core.data_description import DataDescription
 from aind_data_schema.core.processing import DataProcess, ProcessStage, Processing
+from aind_data_schema_models.data_name_patterns import DataLevel, build_data_name
 from aind_data_schema_models.process_names import ProcessName
+
+from co_provenance import fetch_co_provenance
 
 RESULTS_DIR = Path("/results")
 DATA_DIR = Path("/data")
 EXPERIMENTERS = ["Polina Kosillo"]
-PROCESS_NAME_LABEL = "analyzed"  # becomes the process token in the derived name
-
-CO_API_BASE = "https://codeocean.allenneuraldynamics.org/api/v1"
-CO_WEB_BASE = "https://codeocean.allenneuraldynamics.org/capsule"
+ASSET_BASE_NAME = "BARseq_MAPseq_LC-NE_combined"
 AIND_OPEN_DATA_BUCKET = "s3://aind-open-data"
-
-
-def fetch_co_provenance() -> tuple[str, str]:
-    """Return (capsule_url, version) for the running Code Ocean capsule.
-
-    Calls the Code Ocean REST API at runtime to look up the capsule's web URL
-    (built from the slug) and the release version of this run. ``version`` is
-    ``"from non-release editable capsule"`` when running an editable capsule;
-    otherwise a string like ``"v1.0"``.
-
-    Requires the "Code Ocean API Credentials" Secret to be attached to the
-    capsule (Capsule Settings -> Credentials), which exposes API_KEY at
-    runtime. Raises RuntimeError if any required env var is missing or the API
-    call fails.
-    """
-    api_key = os.environ.get("API_KEY")
-    capsule_id = os.environ.get("CO_CAPSULE_ID")
-    computation_id = os.environ.get("CO_COMPUTATION_ID")
-    if not api_key or not capsule_id or not computation_id:
-        raise RuntimeError(
-            "Missing Code Ocean env vars (API_KEY / CO_CAPSULE_ID / "
-            "CO_COMPUTATION_ID). Attach the 'Code Ocean API Credentials' "
-            "Secret to the capsule (Capsule Settings -> Credentials)."
-        )
-
-    auth = base64.b64encode(f"{api_key}:".encode()).decode()
-    headers = {"Authorization": f"Basic {auth}"}
-
-    def _get(path: str) -> dict:
-        req = urllib.request.Request(f"{CO_API_BASE}{path}", headers=headers)
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            return json.loads(resp.read())
-
-    try:
-        capsule = _get(f"/capsules/{capsule_id}")
-        computation = _get(f"/computations/{computation_id}")
-    except (urllib.error.URLError, json.JSONDecodeError) as e:
-        raise RuntimeError(f"Code Ocean API call failed: {e}") from e
-
-    capsule_url = f"{CO_WEB_BASE}/{capsule['slug']}/tree"
-    if "version" in computation:
-        version = f"v{computation['version']}.0"
-    else:
-        version = "from non-release editable capsule"
-    return capsule_url, version
 
 
 def find_input_descriptions() -> list[tuple[Path, DataDescription]]:
     """Discover attached input assets and load their data_description.json.
 
     Returns (asset_dir, DataDescription) for every subdirectory of /data/ that
-    contains a data_description.json. After PR4 the only attached assets are
-    the four analysis inputs (2 BARseq + 2 MAPseq), so this finds exactly those.
+    contains a data_description.json. The attached assets are the four analysis
+    inputs (2 BARseq + 2 MAPseq), so this finds exactly those.
     """
     found = []
     for asset_dir in sorted(p for p in DATA_DIR.iterdir() if p.is_dir()):
@@ -118,34 +69,47 @@ def dedupe_modalities(descriptions: list[DataDescription]) -> list:
     return union
 
 
-def write_data_description(inputs: list[tuple[Path, DataDescription]]) -> None:
-    """Build and write the DERIVED data_description.json for the analysis output."""
+def write_data_description(inputs: list[tuple[Path, DataDescription]], creation_time: datetime) -> None:
+    """Build and write the DERIVED data_description.json for the analysis output.
+
+    Constructed directly (rather than via DataDescription.from_data_description)
+    so the asset name comes from ASSET_BASE_NAME instead of a single input's
+    lineage -- this asset derives from four inputs across two subjects and two
+    modalities, so an input-derived name would be misleading. Institution,
+    funding, investigators and project_name are inherited from the first input.
+    """
     descriptions = [dd for _, dd in inputs]
     source_names = sorted(dd.name for dd in descriptions)
-    base_dd = descriptions[0]  # inherit institution/funding/investigators/project_name
+    base_dd = descriptions[0]
 
-    derived_dd = DataDescription.from_data_description(
-        base_dd,
-        process_name=PROCESS_NAME_LABEL,
-        source_data=source_names,
+    derived_dd = DataDescription(
+        name=build_data_name(ASSET_BASE_NAME, creation_datetime=creation_time),
+        creation_time=creation_time,
+        institution=base_dd.institution,
+        funding_source=base_dd.funding_source,
+        investigators=base_dd.investigators,
+        project_name=base_dd.project_name,
         modalities=dedupe_modalities(descriptions),
+        data_level=DataLevel.DERIVED,
+        subject_id=None,  # spans two subjects; both captured in source_data
+        source_data=source_names,
         data_summary=(
             "Combined BARseq/MAPseq analysis of LC-NE neurons across subjects "
             "780345 and 780346 (manuscript Figure S5)."
         ),
     )
-    # This asset spans two subjects; the single subject_id field can't hold both,
-    # so clear it. Provenance for both subjects is captured in source_data.
-    derived_dd = derived_dd.model_copy(update={"subject_id": None})
     derived_dd.write_standard_file(output_directory=RESULTS_DIR)
-    print(f"  wrote data_description.json (source_data: {source_names})")
+    print(f"  wrote data_description.json (name: {derived_dd.name})")
+    print(f"    source_data: {source_names}")
 
 
-def write_processing(inputs: list[tuple[Path, DataDescription]]) -> None:
+def write_processing(inputs: list[tuple[Path, DataDescription]], start_time: datetime) -> None:
     """Build and write processing.json describing this analysis run.
 
     Skipped with a warning if the Code Ocean API credentials are not available
-    (provenance fields can't be populated reliably without them).
+    (provenance fields can't be populated reliably without them); in that case
+    only data_description.json is written. The start-of-run preflight
+    (00_check_credentials.py) flags the same condition up front.
     """
     try:
         capsule_url, version = fetch_co_provenance()
@@ -153,9 +117,7 @@ def write_processing(inputs: list[tuple[Path, DataDescription]]) -> None:
         print(f"  WARNING: skipping processing.json -- {e}")
         return
 
-    input_assets = [
-        DataAsset(url=f"{AIND_OPEN_DATA_BUCKET}/{dd.name}") for _, dd in inputs
-    ]
+    input_assets = [DataAsset(url=f"{AIND_OPEN_DATA_BUCKET}/{dd.name}") for _, dd in inputs]
     code = Code(
         url=capsule_url,
         name="LC-NE_BARseq_MAPseq_analyses",
@@ -170,7 +132,7 @@ def write_processing(inputs: list[tuple[Path, DataDescription]]) -> None:
         stage=ProcessStage.ANALYSIS,
         code=code,
         experimenters=EXPERIMENTERS,
-        start_date_time=datetime.now(timezone.utc),
+        start_date_time=start_time,
         notes="BARseq normalization/clustering and BARseq-MAPseq projection analysis (Figure S5).",
     )
     processing = Processing(data_processes=[process])
@@ -180,12 +142,13 @@ def write_processing(inputs: list[tuple[Path, DataDescription]]) -> None:
 
 def main() -> None:
     """Generate data_description.json and processing.json in /results/."""
+    now = datetime.now(timezone.utc)
     inputs = find_input_descriptions()
     print(f"Found {len(inputs)} input asset(s) with data_description.json")
     for asset_dir, _ in inputs:
         print(f"  input: {asset_dir.name}")
-    write_data_description(inputs)
-    write_processing(inputs)
+    write_data_description(inputs, now)
+    write_processing(inputs, now)
     print("Done.")
 
 

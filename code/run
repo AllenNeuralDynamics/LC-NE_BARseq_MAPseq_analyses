@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euxo pipefail
 
+# Fail fast: verify the Code Ocean API credentials before the ~2-hour pipeline,
+# so a missing/wrong "Code Ocean API Credentials" Secret is caught now rather
+# than at the metadata step at the very end.
+python3 00_check_credentials.py
+
 render_html() {
   local script="$1"
   local outname
@@ -67,7 +72,7 @@ render_html 6_MAPseq_ExA-SPIM_brain3-4_combined.R
 echo "brain3-4 combined MAPseq ExA plots exit code: $?"
 
 # Reorganize /results/ for publication: copy manuscript panels into
-# paper_figures/FigureS5/ and move per-cohort output under other_figures/.
+# paper_figures/FigureS5/ and move per-cohort output under other_results/.
 Rscript 07_collect_paper_figures.R
 echo "collect paper figures exit code: $?"
 

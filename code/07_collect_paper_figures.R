@@ -7,16 +7,15 @@
 #
 #   results/
 #     paper_figures/FigureS5/   canonically-named copies of the manuscript panels
-#     other_figures/            everything else (per-cohort QC/exploratory output)
+#     other_results/            everything else (per-cohort data, QC plots, reports)
 #
-# Panel -> source-file mapping confirmed by the paper authors on issue #5
-# (only panels e, f, g of Figure S5 come from this capsule; a/b are hand-drawn
-# schematics, and c/d/h are not produced here).
+# Only panels e, f, g of Figure S5 come from this capsule. Panels a/b are
+# hand-drawn schematics; the remaining panels come from other capsules.
 
 RESULTS_DIR <- "/results"
 COMBINED_DIR <- file.path(RESULTS_DIR, "BARseq_780345-780346_combined")
 PAPER_FIG_DIR <- file.path(RESULTS_DIR, "paper_figures", "FigureS5")
-OTHER_FIG_DIR <- file.path(RESULTS_DIR, "other_figures")
+OTHER_RESULTS_DIR <- file.path(RESULTS_DIR, "other_results")
 
 # source basename (in COMBINED_DIR) -> canonical published name
 panel_map <- list(
@@ -42,20 +41,20 @@ for (panel in panel_map) {
   cat(sprintf("paper_figures: %s -> %s\n", panel$src, panel$dst))
 }
 
-# --- 2. Move the per-cohort folders under other_figures/ ----------------------
-dir.create(OTHER_FIG_DIR, recursive = TRUE, showWarnings = FALSE)
+# --- 2. Move the per-cohort folders under other_results/ ----------------------
+dir.create(OTHER_RESULTS_DIR, recursive = TRUE, showWarnings = FALSE)
 cohort_dirs <- c("BARseq_780345", "BARseq_780346", "BARseq_780345-780346_combined")
 for (cohort in cohort_dirs) {
   from <- file.path(RESULTS_DIR, cohort)
-  to   <- file.path(OTHER_FIG_DIR, cohort)
+  to   <- file.path(OTHER_RESULTS_DIR, cohort)
   if (!dir.exists(from)) {
-    cat(sprintf("other_figures: %s not present, skipping\n", cohort))
+    cat(sprintf("other_results: %s not present, skipping\n", cohort))
     next
   }
   if (!file.rename(from, to)) {
     stop(sprintf("Failed to move %s -> %s", from, to))
   }
-  cat(sprintf("other_figures: moved %s/\n", cohort))
+  cat(sprintf("other_results: moved %s/\n", cohort))
 }
 
 cat("Paper-figure collection complete.\n")
