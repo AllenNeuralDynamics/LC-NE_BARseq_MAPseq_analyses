@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euxo pipefail
 
-# Fail fast: verify the Code Ocean API credentials before the ~2-hour pipeline,
+# Verify the Code Ocean API credentials before the ~2-hour pipeline,
 # so a missing/wrong "Code Ocean API Credentials" Secret is caught now rather
 # than at the metadata step at the very end.
 python3 00_check_credentials.py
