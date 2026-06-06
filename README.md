@@ -63,8 +63,9 @@ After all analysis stages run, a final step (`code/07_collect_paper_figures.R`) 
 
 ```
 results/
+  <stage>.html              # rendered analysis report, one per stage
   paper_figures/FigureS5/   # the manuscript panels, named by figure
-  other_results/            # everything else: per-cohort data, QC plots, HTML reports
+  other_results/            # per-cohort data, QC plots, intermediate CSVs
     BARseq_780345/                  (brain3, specimen 780345)
     BARseq_780346/                  (brain4, specimen 780346)
     BARseq_780345-780346_combined/  (combined cross-brain analyses)
