@@ -14,3 +14,7 @@ RUN mamba update -n base -c conda-forge mamba libsolv -y || true \
  && rm /tmp/barseq-r4.yml \
  && echo "/opt/conda/envs/barseq-r4/lib" > /etc/ld.so.conf.d/barseq-r4.conf \
  && ldconfig
+
+# aind-data-schema (Python) is used by code/08_generate_metadata.py to write
+# AIND-compliant derived-asset metadata into /results/.
+RUN python3 -m pip install --no-cache-dir aind-data-schema==2.7.1
