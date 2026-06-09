@@ -16,9 +16,5 @@ RUN mamba update -n base -c conda-forge mamba libsolv -y || true \
  && ldconfig
 
 # aind-data-schema (Python) is used by code/08_generate_metadata.py to write
-# AIND-compliant derived-asset metadata into /results/. aind-data-schema-models
-# is pinned explicitly to the version aind-data-schema 2.7.1 requires; without
-# the pin, a newer models package gets resolved and breaks the import.
-RUN python3 -m pip install --no-cache-dir \
-        aind-data-schema==2.7.1 \
-        aind-data-schema-models==5.4.1
+# AIND-compliant derived-asset metadata into /results/.
+RUN python3 -m pip install --no-cache-dir aind-data-schema==2.7.1 aind-data-schema-models==5.4.1
