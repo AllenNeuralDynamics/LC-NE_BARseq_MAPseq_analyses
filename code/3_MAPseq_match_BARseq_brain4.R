@@ -2,7 +2,7 @@
 # Performs converts BARseq barcodes to MAPseq format, truncates MAPseq 32nt barcodes to 15nt to match BARseq barcode length
 # Identifies uniquely barcoded BARseq cells which have a match in the MAPseq dataset with 0,1,2,or 3 Hamming distance mismatches allowed
 
-MAPSEQ_INPUT_DIR <- '/data/mapseq_780346_2025-07-23_12-00-00/MAPseq/M305_20251030_USEthis/'
+MAPSEQ_INPUT_DIR <- '/data/780346_2025-07-23_12-00-00/MAPseq/M305_20251030_USEthis/'
 
 #set working directory 
 setwd('/results/BARseq_780346/')
@@ -63,7 +63,7 @@ table(colData(LCNEcluster)$louvain_cluster)
 ############################################################################################################################################################################################################
 # Process barcode information for all barcoded cells from BARseq experiment and convert them to MAPseq basecalls format
 # Read CSV without column names, and name columns manually
-barcodes_raw <- read_csv("/data/barseq_780346_2025-06-13_12-00-00_processed_MAT2RDS_2026-05-28_17-50-51/BARseq/barcodes_BC_qc_780346.csv", col_names = FALSE)
+barcodes_raw <- read_csv("/data/780346_2025-06-13_12-00-00_processed-MAT2RDS_2026-06-12_17-45-39/BARseq/barcodes_BC_qc_780346.csv", col_names = FALSE)
 # Rename for clarity
 colnames(barcodes_raw)[1] <- "CellID"
 colnames(barcodes_raw)[2:16] <- paste0("B", 1:15)  # Barcode positions
@@ -378,7 +378,7 @@ print_and_save_duplicates(result_2, proj_2_nodup, "proj_2_duplicated_rows.csv")
 #####################################################################################################################################################################################
 # Only retain cells for genes vs projections processing which pass visual QC
 # Load visual QC info CSV
-visualQC <- read.csv("/data/barseq_780346_2025-06-13_12-00-00_processed_MAT2RDS_2026-05-28_17-50-51/BARseq/LC_visualQC_barcoded_cells_780346.csv", header = TRUE, stringsAsFactors = FALSE)
+visualQC <- read.csv("/data/780346_2025-06-13_12-00-00_processed-MAT2RDS_2026-06-12_17-45-39/BARseq/LC_visualQC_barcoded_cells_780346.csv", header = TRUE, stringsAsFactors = FALSE)
 # Check that the 'uid' column exists
 if (!"uid" %in% colnames(visualQC)) {
   stop("No 'uid' column found in LC_visualQC_barcoded_cells.csv")

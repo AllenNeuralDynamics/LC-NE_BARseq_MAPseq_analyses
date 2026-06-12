@@ -31,31 +31,64 @@ Clustering UMAPs + cluster-label CSVs are committed under `code/cached_clusterin
 
 ## Inputs
 
-Four data assets are attached, one BARseq + one MAPseq per specimen. Files within each are loaded directly from `/data/<asset_mount>/...` by the analysis scripts.
+This capsule expects **four data assets** — one BARseq and one MAPseq asset per specimen (780345 = "brain 3", 780346 = "brain 4"). The assets are detached in `.codeocean/datasets.json`; attach them in Code Ocean before a run. The analysis scripts hard-code the `/data/<mount>/...` paths, so each asset must be mounted under the exact name below:
 
-### BARseq per-specimen assets (`barseq_780345_..._processed_MAT2RDS_...`, `barseq_780346_..._processed_MAT2RDS_...`)
+| Asset (mount name) | Modality | Specimen | Source |
+|---|---|---|---|
+| `780345_2025-02-24_12-00-00_processed-MAT2RDS_2026-06-12_17-43-59` | BARseq | 780345 (brain 3) | derived |
+| `780346_2025-06-13_12-00-00_processed-MAT2RDS_2026-06-12_17-45-39` | BARseq | 780346 (brain 4) | derived |
+| `780345_2025-03-24_12-00-00` | MAPseq | 780345 (brain 3) | raw |
+| `780346_2025-07-23_12-00-00` | MAPseq | 780346 (brain 4) | raw |
 
-Outputs of the `LC-NE_BARseq_MAT-RDS_conversion` capsule, which converts the upstream MATLAB BARseq pipeline outputs into R-friendly formats ([GitHub](https://github.com/AllenNeuralDynamics/LC-NE_BARseq_MAT-RDS_conversion), [Code Ocean](https://codeocean.allenneuraldynamics.org/capsule/3953531)). All files live under `BARseq/` inside each asset.
+The two BARseq assets are outputs of the [`LC-NE_BARseq_MAT-RDS_conversion`](https://github.com/AllenNeuralDynamics/LC-NE_BARseq_MAT-RDS_conversion) capsule ([Code Ocean](https://codeocean.allenneuraldynamics.org/capsule/3953531)), which converts the upstream MATLAB BARseq pipeline outputs into R-friendly formats. Their mount names embed the conversion run's creation timestamp, so they change if the conversion capsule is re-run. The two MAPseq assets are raw projection-barcode counts and dissection metadata.
+
+The files actually consumed by the pipeline, listed under the asset each comes from:
+
+### `780345_..._processed-MAT2RDS_...` — BARseq, brain 3
+
+Paths relative to `BARseq/` within the asset.
 
 | File | Description |
 |---|---|
-| `combined_neurons_clust_CCFv2_uid.rds` | `SingleCellExperiment` of all QCed BARseq cells for the specimen (~300–500 K cells × 103 genes). Contains the raw count matrix plus per-cell `colData` columns: CCF coordinates (`CCF_AP`, `CCF_DV`, `CCF_ML`, `CCFano`), slice index, imaging-FOV coordinates, somatic-barcode index, batch, and a unique cell id (`uid`). Loaded at the top of stage 2; the entry point for the whole pipeline. |
-| `combined_neurons_clust_CCFv2.rds` | Predecessor of the above without `uid` assignment. Not used; superseded. |
-| `DBHfilteredneurons_clust_CCFv2_uid.rds` | An earlier `Dbh`-positive-only subset, kept for historical context. Not used by this pipeline. |
-| `barcodes_BC_qc_<subject>.csv` | Per-cell BARseq somatic barcode sequences (15 nt) for cells that passed barcode QC. Joined to MAPseq projection barcodes via Hamming-distance matching in stage 3. |
-| `LC_visualQC_barcoded_cells_<subject>.csv` | Manual visual-QC annotations of barcoded LC-NE cells (`uid` + QC flags). Used in stages 3 and 4 to restrict barcode matching and projection analyses to cells that passed visual QC. |
+| `combined_neurons_clust_CCFv2_uid.rds` | `SingleCellExperiment` of all QCed BARseq cells for the specimen (~300–500 K cells × 103 genes). Raw count matrix plus per-cell `colData`: CCF coordinates (`CCF_AP`, `CCF_DV`, `CCF_ML`, `CCFano`), slice index, imaging-FOV coordinates, somatic-barcode index, batch, and a unique cell id (`uid`). Loaded at the top of stage 2 — the entry point for the whole pipeline. |
+| `barcodes_BC_qc_780345.csv` | Per-cell BARseq somatic barcode sequences (15 nt) for cells that passed barcode QC. Joined to MAPseq projection barcodes via Hamming-distance matching in stage 3. |
+| `LC_visualQC_barcoded_cells_780345.csv` | Manual visual-QC annotations of barcoded LC-NE cells (`uid` + QC flags). Used in stages 3 and 4 to restrict matching and projection analyses to cells that passed visual QC. |
 
-### MAPseq per-specimen assets (`mapseq_780345_2025-03-24_12-00-00`, `mapseq_780346_2025-07-23_12-00-00`)
+The asset also contains `combined_neurons_clust_CCFv2.rds` (same without `uid`, superseded) and `DBHfilteredneurons_clust_CCFv2_uid.rds` (an earlier `Dbh`-positive-only subset). Neither is used by this pipeline.
 
-Raw MAPseq projection-barcode counts and dissection metadata. The relevant files live in two places inside each asset:
+### `780346_..._processed-MAT2RDS_...` — BARseq, brain 4
 
-| File | Location | Description |
-|---|---|---|
-| `<subject>.nbcm.tsv` | `MAPseq/M<run>_<date>_USEthis/` | Filtered (background-subtracted, spike-in-normalized) MAPseq UMI count matrix — rows = projection barcodes, columns = ROIs (`BC*`) and a soma column. The primary MAPseq input for downstream matching. |
-| `<subject>.rbcm.tsv` | same | Raw MAPseq UMI count matrix (pre-filter). Used in stage 3 QC checks only. |
-| `<subject>.sbcm.tsv` | same | Spike-in barcode counts. Used in stage 3 QC checks only. |
-| `M<run>sampleinfo.tsv` or `M<run>_<date>.sampleinfo.xlsx` | same | Per-tube experiment metadata (tube number, dissection labels, processing notes). The brain3 asset has both; brain4 has only the xlsx. |
-| `sampleinfo_<subject>.tsv` (brain3) / `sampleinfo_<subject>.xlsx` (brain4) | `MAPseq/` (asset root) | Curated lookup table mapping MAPseq sample-tube numbers (`BC*`) to CCF brain-region names + dissection metadata. Used in stages 1/4 to label projection columns with region names. |
+Same layout as the brain-3 BARseq asset, with `780346` in place of `780345`. Paths relative to `BARseq/`.
+
+| File | Description |
+|---|---|
+| `combined_neurons_clust_CCFv2_uid.rds` | As above, for specimen 780346. Entry point for stage 2. |
+| `barcodes_BC_qc_780346.csv` | As above, for specimen 780346. |
+| `LC_visualQC_barcoded_cells_780346.csv` | As above, for specimen 780346. |
+
+Also contains the unused `combined_neurons_clust_CCFv2.rds` and `DBHfilteredneurons_clust_CCFv2_uid.rds`.
+
+### `780345_2025-03-24_12-00-00` — MAPseq, brain 3
+
+| File | Description |
+|---|---|
+| `MAPseq/M295_20250729_USEthis/780345.nbcm.tsv` | Filtered (background-subtracted, spike-in-normalized) MAPseq UMI count matrix — rows = projection barcodes, columns = ROIs (`BC*`) and a soma column. The primary MAPseq input for downstream matching (stage 3). |
+| `MAPseq/M295_20250729_USEthis/780345.rbcm.tsv` | Raw MAPseq UMI count matrix (pre-filter). Stage 3 QC checks only. |
+| `MAPseq/M295_20250729_USEthis/780345.sbcm.tsv` | Spike-in barcode counts. Stage 3 QC checks only. |
+| `MAPseq/M295_20250729_USEthis/M295_20250721.sampleinfo.xlsx` | Per-tube experiment metadata (tube number, dissection labels, processing notes). Read by the stage-1 loaders. |
+| `MAPseq/sampleinfo_780345.tsv` | Curated lookup mapping sample-tube numbers (`BC*`) to CCF brain-region names + dissection metadata. Labels projection columns with region names (stages 1/4). |
+
+### `780346_2025-07-23_12-00-00` — MAPseq, brain 4
+
+Same structure as the brain-3 MAPseq asset, but the count-matrix files carry a `1025` suffix and the per-tube metadata is a `.tsv`.
+
+| File | Description |
+|---|---|
+| `MAPseq/M305_20251030_USEthis/780346.nbcm1025.tsv` | Filtered MAPseq UMI count matrix (primary input, stage 3). |
+| `MAPseq/M305_20251030_USEthis/780346.rbcm1025.tsv` | Raw MAPseq UMI count matrix (pre-filter). Stage 3 QC checks only. |
+| `MAPseq/M305_20251030_USEthis/780346.sbcm1025.tsv` | Spike-in barcode counts. Stage 3 QC checks only. |
+| `MAPseq/M305_20251030_USEthis/M305sampleinfo.tsv` | Per-tube experiment metadata. Read by the stage-1 loaders. |
+| `MAPseq/sampleinfo_780346.xlsx` | Curated tube → CCF-region lookup + dissection metadata (stages 1/4). |
 
 ## Outputs
 
