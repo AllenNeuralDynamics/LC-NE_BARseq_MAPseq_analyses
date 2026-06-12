@@ -33,7 +33,7 @@ from co_provenance import fetch_co_provenance
 RESULTS_DIR = Path("/results")
 DATA_DIR = Path("/data")
 EXPERIMENTERS = ["Polina Kosillo"]
-ASSET_BASE_NAME = "BARseq_MAPseq_LC-NE_combined"
+ASSET_BASE_NAME = "BARseq-MAPseq-LC-NE-combined"
 AIND_OPEN_DATA_BUCKET = "s3://aind-open-data"
 
 

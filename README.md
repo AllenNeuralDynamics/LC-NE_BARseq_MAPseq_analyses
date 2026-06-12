@@ -33,7 +33,7 @@ Clustering UMAPs + cluster-label CSVs are committed under `code/cached_clusterin
 
 Four data assets are attached, one BARseq + one MAPseq per specimen. Files within each are loaded directly from `/data/<asset_mount>/...` by the analysis scripts.
 
-### BARseq per-specimen assets (`barseq_780345_..._processed_MAT2RDS_...`, `barseq_780346_..._processed_MAT2RDS_...`)
+### BARseq per-specimen assets (`780345_..._processed-MAT2RDS_...`, `780346_..._processed-MAT2RDS_...`)
 
 Outputs of the `LC-NE_BARseq_MAT-RDS_conversion` capsule, which converts the upstream MATLAB BARseq pipeline outputs into R-friendly formats ([GitHub](https://github.com/AllenNeuralDynamics/LC-NE_BARseq_MAT-RDS_conversion), [Code Ocean](https://codeocean.allenneuraldynamics.org/capsule/3953531)). All files live under `BARseq/` inside each asset.
 
