@@ -1,6 +1,6 @@
 ################# MAPseq Barcode checks for CTX slices replicating Kebschull paper ##################
 
-MAPSEQ_INPUT_DIR <- '/data/mapseq_780345_2025-03-24_12-00-00/MAPseq/M295_20250729_USEthis/'
+MAPSEQ_INPUT_DIR <- '/data/780345_2025-03-24_12-00-00/MAPseq/M295_20250729_USEthis/'
 
 #set working directory 
 setwd('/results/BARseq_780345/')
@@ -14,7 +14,7 @@ LCNEneurons <- readRDS("LCNE_clusters_filtered_coherence_filtered_cpm_log_clust.
 colData(LCNEneurons)
 cell_metadata <- as.data.frame(colData(LCNEneurons))
 
-proj_index <- read_tsv("/data/mapseq_780345_2025-03-24_12-00-00/MAPseq/sampleinfo_780345.tsv")
+proj_index <- read_tsv("/data/780345_2025-03-24_12-00-00/MAPseq/sampleinfo_780345.tsv")
 head(proj_index)
 sampleinfo <- read_excel(file.path(MAPSEQ_INPUT_DIR, "M295_20250721.sampleinfo.xlsx"), sheet = "Sample information")
 head(sampleinfo)

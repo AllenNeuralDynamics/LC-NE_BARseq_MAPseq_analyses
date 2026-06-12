@@ -1,4 +1,4 @@
-MAPSEQ_INPUT_DIR <- '/data/mapseq_780346_2025-07-23_12-00-00/MAPseq/M305_20251030_USEthis/'
+MAPSEQ_INPUT_DIR <- '/data/780346_2025-07-23_12-00-00/MAPseq/M305_20251030_USEthis/'
 
 # Function to pre-process and load the data in a format directly usable by downstream analyses
 load_data <-function() {
@@ -40,7 +40,7 @@ load_data <-function() {
   # Load sample information
   proj_index <- read_tsv(file.path(MAPSEQ_INPUT_DIR, "M305sampleinfo.tsv"))
   head(proj_index)
-  sampleinfo <- read_excel("/data/mapseq_780346_2025-07-23_12-00-00/MAPseq/sampleinfo_780346.xlsx", sheet = "Sample information", skip = 1,range = "A2:J122")
+  sampleinfo <- read_excel("/data/780346_2025-07-23_12-00-00/MAPseq/sampleinfo_780346.xlsx", sheet = "Sample information", skip = 1,range = "A2:J122")
   head(sampleinfo)
   colnames(sampleinfo) <- c("usertube", "ourtube", "samplename", "siteinfo", "QC_qPCR", "rtprimer", "brain", "hemisphere", "ROI", "notes")
 

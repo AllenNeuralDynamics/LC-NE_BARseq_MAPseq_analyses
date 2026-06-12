@@ -37,8 +37,8 @@ This capsule expects **four data assets** — one BARseq and one MAPseq asset pe
 |---|---|---|---|
 | `780345_2025-02-24_12-00-00_processed-MAT2RDS_2026-06-12_17-43-59` | BARseq | 780345 (brain 3) | derived |
 | `780346_2025-06-13_12-00-00_processed-MAT2RDS_2026-06-12_17-45-39` | BARseq | 780346 (brain 4) | derived |
-| `mapseq_780345_2025-03-24_12-00-00` | MAPseq | 780345 (brain 3) | raw |
-| `mapseq_780346_2025-07-23_12-00-00` | MAPseq | 780346 (brain 4) | raw |
+| `780345_2025-03-24_12-00-00` | MAPseq | 780345 (brain 3) | raw |
+| `780346_2025-07-23_12-00-00` | MAPseq | 780346 (brain 4) | raw |
 
 The two BARseq assets are outputs of the [`LC-NE_BARseq_MAT-RDS_conversion`](https://github.com/AllenNeuralDynamics/LC-NE_BARseq_MAT-RDS_conversion) capsule ([Code Ocean](https://codeocean.allenneuraldynamics.org/capsule/3953531)), which converts the upstream MATLAB BARseq pipeline outputs into R-friendly formats. Their mount names embed the conversion run's creation timestamp, so they change if the conversion capsule is re-run. The two MAPseq assets are raw projection-barcode counts and dissection metadata.
 
@@ -68,7 +68,7 @@ Same layout as the brain-3 BARseq asset, with `780346` in place of `780345`. Pat
 
 Also contains the unused `combined_neurons_clust_CCFv2.rds` and `DBHfilteredneurons_clust_CCFv2_uid.rds`.
 
-### `mapseq_780345_2025-03-24_12-00-00` — MAPseq, brain 3
+### `780345_2025-03-24_12-00-00` — MAPseq, brain 3
 
 | File | Description |
 |---|---|
@@ -78,7 +78,7 @@ Also contains the unused `combined_neurons_clust_CCFv2.rds` and `DBHfilteredneur
 | `MAPseq/M295_20250729_USEthis/M295_20250721.sampleinfo.xlsx` | Per-tube experiment metadata (tube number, dissection labels, processing notes). Read by the stage-1 loaders. |
 | `MAPseq/sampleinfo_780345.tsv` | Curated lookup mapping sample-tube numbers (`BC*`) to CCF brain-region names + dissection metadata. Labels projection columns with region names (stages 1/4). |
 
-### `mapseq_780346_2025-07-23_12-00-00` — MAPseq, brain 4
+### `780346_2025-07-23_12-00-00` — MAPseq, brain 4
 
 Same structure as the brain-3 MAPseq asset, but the count-matrix files carry a `1025` suffix and the per-tube metadata is a `.tsv`.
 

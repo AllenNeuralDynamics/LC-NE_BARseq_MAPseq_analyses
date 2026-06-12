@@ -2,7 +2,7 @@
 # Performs converts BARseq barcodes to MAPseq format, truncates MAPseq 32nt barcodes to 15nt to match BARseq barcode length
 # Identifies uniquely barcoded BARseq cells which have a match in the MAPseq dataset with 0,1,2,or 3 Hamming distance mismatches allowed
 
-MAPSEQ_INPUT_DIR <- '/data/mapseq_780345_2025-03-24_12-00-00/MAPseq/M295_20250729_USEthis/'
+MAPSEQ_INPUT_DIR <- '/data/780345_2025-03-24_12-00-00/MAPseq/M295_20250729_USEthis/'
 
 #set working directory 
 setwd('/results/BARseq_780345/')
