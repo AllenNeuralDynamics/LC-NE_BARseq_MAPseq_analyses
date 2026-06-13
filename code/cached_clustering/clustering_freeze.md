@@ -29,6 +29,6 @@ The first round of clustering operates on ~3M QCed cells and takes many hours of
 
 ## Forcing a fresh clustering run
 
-To bypass the cached CSVs and recompute clustering from scratch, set the `RECOMPUTE_CLUSTERING` environment variable to `true` (or `1`, or `yes`) before triggering a Reproducible Run. On Code Ocean this is set in the capsule's Environment Variables (gear icon → Environment Variables). The flag is read once at the top of `code/setup.R` and short-circuits every cache-check `if` block in the three `code/2_BARseq_norm_cluster_analyze_*.R` scripts.
+To bypass the cached CSVs and recompute clustering from scratch, set the `RECOMPUTE_CLUSTERING` environment variable to `true` (or `1`, or `yes`) before triggering a Reproducible Run. This is defined in the `/environment/Dockerfile`. The flag is read once in `code/setup.R` and short-circuits every cache-check `if` block in the three `code/2_BARseq_norm_cluster_analyze_*.R` scripts.
 
 Plan for a long run: clustering all ~3M QCed cells in the first round takes many hours of compute.

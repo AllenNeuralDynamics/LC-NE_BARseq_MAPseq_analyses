@@ -18,3 +18,7 @@ RUN mamba update -n base -c conda-forge mamba libsolv -y || true \
 # aind-data-schema (Python) is used by code/08_generate_metadata.py to write
 # AIND-compliant derived-asset metadata into /results/.
 RUN python3 -m pip install --no-cache-dir aind-data-schema==2.7.1 aind-data-schema-models==5.4.1
+
+# Bypass the committed clustering cache and recompute from scratch.
+# Read by RECOMPUTE_CLUSTERING in code/setup.R. See code/cached_clustering/clustering_freeze.md.
+ENV RECOMPUTE_CLUSTERING=false
