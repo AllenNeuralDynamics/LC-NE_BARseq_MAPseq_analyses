@@ -1,7 +1,7 @@
 ################# BARseq Analysis Functions #################
 
 # Set up paths
-BARSEQ_INPUT_DIR <- '/data/780345_2025-02-24_12-00-00_processed-MAT2RDS_2026-06-12_17-43-59/BARseq/'  # read-only
+BARSEQ_INPUT_DIR <- '/data/780345_2025-02-24_12-00-00_processed-MAT2RDS_2026-06-16_00-49-36/BARseq/'  # read-only
 BARSEQ_OUTPUT_DIR <- '/results/BARseq_780345/'  # writable
 BARSEQ_CLUSTERING_DIR <- '/code/cached_clustering/BARseq_780345/'  # pre-computed clustering, read-only — see clustering_freeze.md for provenance
 
