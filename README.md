@@ -35,8 +35,8 @@ This capsule expects **four data assets** — one BARseq and one MAPseq asset pe
 
 | Asset (mount name) | Modality | Specimen | Source |
 |---|---|---|---|
-| `780345_2025-02-24_12-00-00_processed-MAT2RDS_2026-06-16_00-49-36` | BARseq | 780345 (brain 3) | derived |
-| `780346_2025-06-13_12-00-00_processed-MAT2RDS_2026-06-16_00-51-19` | BARseq | 780346 (brain 4) | derived |
+| `780345_2025-02-24_12-00-00_processed-MAT2RDS_2026-06-16_20-30-47` | BARseq | 780345 (brain 3) | derived |
+| `780346_2025-06-13_12-00-00_processed-MAT2RDS_2026-06-16_20-32-31` | BARseq | 780346 (brain 4) | derived |
 | `780345_2025-03-24_12-00-00` | MAPseq | 780345 (brain 3) | raw |
 | `780346_2025-07-23_12-00-00` | MAPseq | 780346 (brain 4) | raw |
 
