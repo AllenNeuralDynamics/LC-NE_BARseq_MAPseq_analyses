@@ -2172,6 +2172,12 @@ if (nrow(unique_df) > 0) {
 }
 
 ############################################################# check how MAPseq cells relate to combined versus separate processing ###############################################################
+# NOTE: the block below reads cell_top_projections_with_coords.csv,
+# which is written by stage 6 (6_MAPseq_ExA-SPIM_brain3-4_combined.R). In the Reproducible
+# Run, stage 2 executes before stage 6, so the file is absent here and this block errored.
+# Guarded with file.exists() so it still runs interactively (after stage 6) but is skipped
+# cleanly in the pipeline. Was this cross-reference meant to run inside stage 2?
+if (file.exists("cell_top_projections_with_coords.csv")) {
 # Read the CSV file into MAPseq_cells
 MAPseq_cells <- read.csv("cell_top_projections_with_coords.csv", header = TRUE)
 head(MAPseq_cells)
@@ -2258,6 +2264,9 @@ print(mapseq_brain3_df)
 
 cat("MAPseq data for unique LCNE cells in brain4:\n")
 print(mapseq_brain4_df)
+} else {
+  cat("cell_top_projections_with_coords.csv not found (stage-6 output); skipping MAPseq cross-reference diagnostic.\n")
+}
 
 ####################################################################################################################################################################################### 
 # check DE genes between brain3 and 4 for combined and separate processing 
