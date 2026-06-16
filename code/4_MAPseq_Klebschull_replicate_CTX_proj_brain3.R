@@ -577,7 +577,7 @@ write.csv(sanity_table, "duplicate_positions_sanity_table.csv", row.names = FALS
 # QC + transcriptomic metrics for duplicate groups (VBC groups; includes mapped MAPseq hash ID)
 ####################################################################################################
 # Load segmentation QC data
-good_cells <- read.csv("/data/780345_2025-02-24_12-00-00_processed-MAT2RDS_2026-06-16_00-49-36/BARseq/LC_visualQC_barcoded_cells_780345.csv", stringsAsFactors = FALSE)
+good_cells <- read.csv("/data/780345_2025-02-24_12-00-00_processed-MAT2RDS_2026-06-16_20-30-47/BARseq/LC_visualQC_barcoded_cells_780345.csv", stringsAsFactors = FALSE)
 # Standardize uid column as character (safer joins)
 good_cells$uid <- as.character(good_cells$uid)
 good_uids <- good_cells$uid[good_cells$good_barcoded == 1]
