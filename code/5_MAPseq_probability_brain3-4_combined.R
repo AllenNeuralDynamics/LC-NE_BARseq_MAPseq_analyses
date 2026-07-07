@@ -390,7 +390,7 @@ c(
   contra_contra_p90 = unname(quantile(vals_contra_contra, 0.90))
 )
 
-#Optional null model scaffold (only if you want inferential language later)
+#Optional null model scaffold
 #This preserves per-cell projection breadth (row sums) while breaking target identity; you can compare observed off-diagonal median or the fraction ≥0.7 to the null distribution.
 set.seed(1)
 df_bin <- (source_matrix > 0) * 1

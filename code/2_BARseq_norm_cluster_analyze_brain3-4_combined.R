@@ -2072,8 +2072,6 @@ dev.off()
 
 
 
-
-
 ###################################################################################################################################################################################
 # Troubleshooting comparisons between cells for LCNE isolation combined at the outset vs each sample processed separately first and MAPseq/BARseq overlap
 ###################################################################################################################################################################################
@@ -2928,197 +2926,17 @@ write.csv(df_export, file = "Dbh_Th_Slc18a2_logcounts_adj_Dbh.csv", row.names = 
 cat("Exported", nrow(df_export), "cells x", ncol(df_export), "columns to Dbh_Th_Slc18a2_logcounts_adj_Dbh.csv\n")
 
 
+# Export the FULL cell-by-gene read matrix for the final filtered fromLCNE cells
+# Uses the Dbh-corrected raw reads (counts_adj_Dbh) so it stays consistent with the
+# corrected expression used downstream. All non-Dbh genes are identical to the raw counts.
+# Rows = cells (row names are cell IDs), columns = genes, values = corrected reads.
+reads_mat <- as.matrix(assay(fromLCNE, "counts_adj_Dbh"))   # genes x cells
+reads_cell_by_gene <- as.data.frame(t(reads_mat))           # transpose -> cells x genes
+# Add batch info (parity with the Dbh/Th/Slc18a2 export)
+reads_cell_by_gene$batch <- colData(fromLCNE)$batch
+write.csv(reads_cell_by_gene,
+          file = file.path(BARSEQ_OUTPUT_DIR, "fromLCNE_counts_adj_Dbh_cell_by_gene.csv"),
+          row.names = TRUE)
+cat("Exported", nrow(reads_cell_by_gene), "cells x", ncol(reads_cell_by_gene),
+    "genes to fromLCNE_counts_adj_Dbh_cell_by_gene.csv\n")
 
-
-
-
-
-
-
-
-
-############################################################# CCA integrate brain3 and 4 gene expression to batch correct ###############################################################
-# Convert SCE to Seurat
-brain3_seurat <- as.Seurat(brain3_subset, counts = "counts", data = NULL)  # Use appropriate assay slot
-brain4_seurat <- as.Seurat(brain4, counts = "counts", data = NULL)
-
-# Add batch metadata
-brain3_seurat$batch <- "brain3"
-brain4_seurat$batch <- "brain4"
-
-# Prepare individual objects (normalize and find features)
-brain3_seurat <- NormalizeData(brain3_seurat)
-brain3_seurat <- FindVariableFeatures(brain3_seurat, selection.method = "vst", nfeatures = 100)  # Reduce to <=102
-
-brain4_seurat <- NormalizeData(brain4_seurat)
-brain4_seurat <- FindVariableFeatures(brain4_seurat, selection.method = "vst", nfeatures = 100)
-
-brain3_seurat$batch <- "brain3"
-brain4_seurat$batch <- "brain4"
-
-# Find integration anchors (reduce dims to avoid over-fitting)
-anchors <- FindIntegrationAnchors(object.list = list(brain3_seurat, brain4_seurat), 
-                                  dims = 1:10, reduction = "cca")  # Or 1:20 max
-
-# Integrate
-integrated_seurat <- IntegrateData(anchorset = anchors, dims = 1:10)
-# Set default assay
-DefaultAssay(integrated_seurat) <- "integrated"
-integrated_seurat <- ScaleData(integrated_seurat)
-integrated_seurat <- RunPCA(integrated_seurat, npcs = 10)  # Max ~102
-integrated_seurat <- RunUMAP(integrated_seurat, reduction = "pca", dims = 1:10)
-integrated_seurat <- FindNeighbors(integrated_seurat, reduction = "pca", dims = 1:10)
-integrated_seurat <- FindClusters(integrated_seurat, resolution = 0.1)
-
-p1 <- DimPlot(integrated_seurat, reduction = "umap", group.by = "seurat_clusters") +
-  ggtitle("Integrated Clusters")
-p2 <- DimPlot(integrated_seurat, reduction = "umap", group.by = "batch") +
-  ggtitle("Integrated Batch")
-plot_grid(p1, p2, ncol = 2)
-
-# Plot clustree
-resolutions <- seq(0.1, 1.0, by = 0.1)
-for (res in resolutions) {
-  integrated_seurat  <- FindClusters(integrated_seurat , resolution = res)
-  integrated_seurat [[paste0("res.", res)]] <- integrated_seurat $seurat_clusters
-}
-clustree(integrated_seurat, prefix = "res.") + ggtitle("Cluster Stability Across Resolutions")
-# Plot UMAPs at different resolutions
-p1 <- DimPlot(integrated_seurat, reduction = "umap", group.by = "res.0.1") + ggtitle("Resolution 0.1")
-p2 <- DimPlot(integrated_seurat, reduction = "umap", group.by = "res.0.2") + ggtitle("Resolution 0.2")
-p3 <- DimPlot(integrated_seurat, reduction = "umap", group.by = "res.0.3") + ggtitle("Resolution 0.3")
-p4 <- DimPlot(integrated_seurat, reduction = "umap", group.by = "res.0.3") + ggtitle("Resolution 0.4")
-plot_grid(p1, p2, p3, p4, ncol = 2)
-
-# Export integrated expression matrix (genes x cells)
-expr <- GetAssayData(integrated_seurat, assay = "integrated", layer = "data")
-head(expr)
-dim(expr)
-write.csv(expr, "integrated_gene_expression.csv")
-
-# Export metadata (includes cell info like barcodes, clusters, batch, projections if added)
-meta <- integrated_seurat@meta.data
-head(meta)
-dim(meta)
-write.csv(meta, "integrated_metadata.csv")
-
-# Alternatively, save the full Seurat object for external use
-saveRDS(integrated_seurat, "integrated_seurat.rds")
-
-############################################################# drop Dbh and Tacr3 from analyses ###############################################################
-# # Load separately processed datasets and concatenate them
-# brain3 <- readRDS("/results/BARseq_780345/LCNE_clusters_filtered_coherence_filtered_cpm_log_clust.rds")
-# dim(brain3)
-# brain4 <- readRDS("/results/BARseq_780346/LCNE_clusters_filtered_coherence_filtered_cpm_log_clust.rds")
-# dim(brain4)
-# # Examine why gene vectors are different length, only keep shared genes
-# # Extract gene names from both objects
-# genes_brain3 <- rownames(brain3)
-# genes_brain4 <- rownames(brain4)
-# # Find genes unique to brain3 (not in brain4)
-# unique_to_brain3 <- setdiff(genes_brain3, genes_brain4)
-# # Find genes unique to brain4 (not in brain3)
-# unique_to_brain4 <- setdiff(genes_brain4, genes_brain3)
-# # Find common genes
-# common_genes <- intersect(genes_brain3, genes_brain4)
-# # Print lengths for summary
-# cat("Genes unique to brain3:", length(unique_to_brain3), "\n")
-# cat("Genes unique to brain4:", length(unique_to_brain4), "\n")
-# cat("Common genes:", length(common_genes), "\n")
-# # View first few unique genes
-# head(unique_to_brain3)
-# head(unique_to_brain4)
-# # Subset brain3 to only include genes (rows) shared with brain4
-# brain3_subset <- brain3[rownames(brain3) %in% rownames(brain4), ]
-# # Verify the new dimensions
-# dim(brain3_subset)
-# # Concatenate along columns (cells)
-# combined_sce <- cbind(brain3_subset, brain4)
-# # Verify dimensions
-# dim(combined_sce)
-# # Add a batch column
-# colData(combined_sce)$batch <- c(rep("brain3", ncol(brain3_subset)), rep("brain4", ncol(brain4)))
-
-head(combined_sce)
-gene_names <- rownames(combined_sce)
-genes_to_remove <- c("Dbh", "Tacr3")
-combined_sce <- combined_sce[!gene_names %in% genes_to_remove, ]
-dim(combined_sce)
-
-Dbh_Tacr3_dropped_test <- combined_sce
-v<-analyze_barseq(Dbh_Tacr3_dropped_test, "Dbh_Tacr3_dropped_test")
-new_barseq <- v[[1]]
-clusters <- v[[2]]
-#visualize UMAP of samples - set color palette
-n_clusters <- length(unique(clusters[["label"]]))
-color_palette <- get_cluster_colors(n_clusters)
-# Extract UMAP coordinates and total gene counts
-umap_data <- reducedDim(new_barseq, "UMAP")
-total_genes <- colSums(counts(new_barseq))
-# Create plotting data frames
-plot_data_cluster <- data.frame(UMAP1 = umap_data[,1], UMAP2 = umap_data[,2], cluster = factor(clusters[["label"]]))
-plot_data_genes <- data.frame(UMAP1 = umap_data[,1], UMAP2 = umap_data[,2], TotalGenes = total_genes)
-plot_data_batch <- data.frame(UMAP1 = umap_data[,1], UMAP2 = umap_data[,2], batch = colData(Dbh_Tacr3_dropped_test)$batch)
-# Sort data for TotalGenes to plot higher values on top
-plot_data_genes <- plot_data_genes %>%
-dplyr::arrange(TotalGenes)
-# Calculate cluster centroids
-centroid_data <- plot_data_cluster %>%
-dplyr::group_by(cluster) %>%
-dplyr::summarise(x = mean(UMAP1), y = mean(UMAP2))
-# Plot UMAP with clusters
-p1 <- ggplot(plot_data_cluster, aes(x = UMAP1, y = UMAP2, color = cluster)) +
-geom_point(size = 0.05) +  # Smaller point size
-scale_color_manual(values = color_palette) +
-geom_text(data = centroid_data, aes(x = x, y = y, label = cluster),
-colour = "black", vjust = 1.6, hjust = 0.5, size = 3.5) +  # Add cluster numbers
-theme_minimal() +
-theme(legend.position = "none", panel.grid = element_blank()) +  # Remove grids
-labs(title = "UMAP plot", x = "UMAP1", y = "UMAP2", color = "Cluster")
-# Plot UMAP with total gene counts
-p2 <- ggplot(plot_data_genes, aes(x = UMAP1, y = UMAP2, color = TotalGenes)) +
-geom_point(size = 0.05) +  # Smaller point size
-scale_color_gradient(low = "grey", high = "magenta") +
-theme_minimal() +
-theme(panel.grid = element_blank()) +  # Remove grids
-labs(title = "Total counts", x = "UMAP1", y = "UMAP2", color = "Gene Count")
-# Plot UMAP with batch
-p3 <- ggplot(plot_data_batch, aes(x = UMAP1, y = UMAP2, color = batch)) +
-geom_point(size = 0.01, alpha = 0.1) +  # Smaller point size, alpha for density
-scale_color_manual(values = c("brain3" = "blue", "brain4" = "green")) +  # Custom colors
-theme_minimal() +
-theme(panel.grid = element_blank()) +  # Remove grids
-labs(title = "Batch", x = "UMAP1", y = "UMAP2", color = "Batch")
-# 3 panels (clusters, total genes, batch)
-p_combined1 <- grid.arrange(grobs = list(p1, p2, p3), ncol = 3)
-print(p_combined1)
-ggsave("LCNE_cells_clusters_genes_batch_Dbh-Tacr3_dropped.pdf", plot = p_combined1, device = "pdf", width = 14, height = 8)
-
-
-genes <- c("Th", "Ddc", "Slc18a2", "Dlk1", "Eya2","Pdyn")
-plots_genes <- list()
-for (gene in genes) {
-  plot_data_cluster[[gene]] <- logcounts(Dbh_Tacr3_dropped_test)[gene, ]
-  # Sort data for each gene to plot higher expression values on top
-  plot_data_sorted <- plot_data_cluster %>%
-    dplyr::arrange(!!sym(gene))
-  
-  p <- ggplot(plot_data_sorted, aes(x = UMAP1, y = UMAP2, color = !!sym(gene))) +
-    geom_point(size = 0.02) +  # Smaller point size
-    scale_color_gradient(low = "cyan", high = "red") +
-    theme_minimal() +
-    theme(panel.grid = element_blank()) +  # Remove grids
-    labs(title = paste(gene, "Expression"), x = "UMAP1", y = "UMAP2", color = "Logcounts")
-  
-  plots_genes[[length(plots_genes) + 1]] <- p
-}
-p_combined3 <- grid.arrange(grobs = plots_genes, ncol = 3, nrow = 2)
-print(p_combined3)
-ggsave("LCNE_cells_gene_expression_Dbh-Tacr3_dropped.pdf", plot = p_combined3, device = "pdf", width = 10, height = 8)  
-
-#include cluster assignment data to the original SingleCellExperiment object
-table(clusters$label)
-all(clusters[['sample']]==colnames(Dbh_Tacr3_dropped_test)) # should be true
-colData(Dbh_Tacr3_dropped_test)$louvain_cluster <- as.factor(clusters[["label"]])
-
-saveRDS(Dbh_Tacr3_dropped_test, "Dbh_Tacr3_dropped_test_CCFv2_uid_cpm_log_clust.rds")
