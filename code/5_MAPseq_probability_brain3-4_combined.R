@@ -91,6 +91,13 @@ heatmap.2(
 dev.copy(pdf, "Combined_ipsi-contra_projections_heatmap_top_region_sorted.pdf", width = 14, height = 10)
 dev.off()
 
+# Save the data frame underlying the heatmap (cells sorted by top projection region)
+write.csv(
+  combined_norm_sorted,
+  "Combined_ipsi-contra_projections_heatmap_top_region_sorted.csv",
+  row.names = TRUE
+)
+
 # Select ipsi columns and spinal cord columns from combined_norm_df
 ipsi_cols <- grep("-ipsi", colnames(combined_norm_df), value = TRUE)
 spinal_cols <- grep("_SP", colnames(combined_norm_df), value = TRUE)

@@ -119,6 +119,14 @@ grid::grid.newpage()
 grid::grid.draw(p$gtable)
 dev.off()
 
+
+# Save the data frame used for the sorted projection heatmap
+write.csv(
+  data.frame(cell_id = rownames(normalized_mat_sorted), normalized_mat_sorted,
+             check.names = FALSE),
+  "MAPseq_sorted_proj_heatmap_ipsi-contra_data.csv", row.names = FALSE
+)
+
 corr_matrix <- cor(normalized_mat_sorted, method = "spearman", use = "pairwise.complete.obs")
 head(corr_matrix)
 
@@ -176,6 +184,12 @@ grid::grid.newpage()
 grid::grid.draw(p$gtable)
 grid.text("Rank correlation", x = 0.992, y = 0.83, rot = 90, gp = gpar(fontsize = 11))
 dev.off()
+
+# Save the correlation matrix used for the co-innervation heatmap
+write.csv(
+  data.frame(region = rownames(corr_matrix), corr_matrix, check.names = FALSE),
+  "MAPseq_rank_corr_ipsi-contra_data.csv", row.names = FALSE
+)
 
 # Create a data frame with cell information and their top projections
 cell_top_projections <- data.frame(
